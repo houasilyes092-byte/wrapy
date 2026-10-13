@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/cart";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, calculateShipping, DEFAULT_SHIPPING_PRICE } from "@/lib/utils";
 import {
   ShoppingBag,
   Loader2,
@@ -13,6 +13,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -41,19 +42,92 @@ export default function CheckoutPage() {
     notes: "",
   });
 
-  /*
-   * IMPORTANT:
-   * Your formatPrice() appears to work with the same
-   * numeric unit used by the cart.
-   *
-   * Your previous checkout displayed 8 DT as shipping,
-   * so keep shipping at 8 here.
-   */
-  const shipping = 8;
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+
+  // Generate or retrieve idempotency key for duplicate submission prevention
+  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+  const keyLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (keyLoadedRef.current) return;
+    keyLoadedRef.current = true;
+
+    let key = sessionStorage.getItem("wrapy-checkout-key");
+    if (!key) {
+      key = crypto.randomUUID();
+      sessionStorage.setItem("wrapy-checkout-key", key);
+    }
+    setIdempotencyKey(key);
+  }, []);
+
+  const shipping = calculateShipping(subtotal, DEFAULT_SHIPPING_PRICE);
 
   const discount = couponApplied?.discount || 0;
 
   const total = Math.max(0, subtotal + shipping - discount);
+
+  function validateField(name: string, value: string): string {
+    switch (name) {
+      case "customerName":
+        if (!value.trim()) return "Full name is required";
+        if (value.trim().length < 2) return "Name must be at least 2 characters";
+        return "";
+      case "phone":
+        if (!value.trim()) return "Phone number is required";
+        if (!/^[\d\s+\-()]{8,}$/.test(value)) return "Enter a valid phone number";
+        return "";
+      case "email":
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid email";
+        return "";
+      case "address":
+        if (!value.trim()) return "Address is required";
+        if (value.trim().length < 5) return "Address must be at least 5 characters";
+        return "";
+      case "city":
+        if (!value.trim()) return "City is required";
+        return "";
+      case "postalCode":
+        if (value && value.length < 3) return "Enter a valid postal code";
+        return "";
+      default:
+        return "";
+    }
+  }
+
+  function handleBlur(name: string, value: string) {
+    setTouchedFields((prev) => ({ ...prev, [name]: true }));
+    const error = validateField(name, value);
+    setFieldErrors((prev) => ({ ...prev, [name]: error }));
+  }
+
+  function handleChange(name: string, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value }));
+    // Clear error on change if field was touched
+    if (touchedFields[name]) {
+      const error = validateField(name, value);
+      setFieldErrors((prev) => ({ ...prev, [name]: error }));
+    }
+  }
+
+  function validateForm(): boolean {
+    const errors: Record<string, string> = {};
+    let isValid = true;
+
+    Object.keys(form).forEach((key) => {
+      const error = validateField(key, form[key as keyof typeof form]);
+      if (error) {
+        errors[key] = error;
+        isValid = false;
+      }
+    });
+
+    setFieldErrors(errors);
+    setTouchedFields(
+      Object.keys(form).reduce((acc, key) => ({ ...acc, [key]: true }), {})
+    );
+    return isValid;
+  }
 
   async function validateCoupon() {
     if (!couponCode.trim()) {
@@ -109,6 +183,11 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Client-side validation
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -121,6 +200,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           ...form,
           couponCode: couponApplied?.code || "",
+          idempotencyKey,
           items: items.map((item) => ({
             productId: item.productId,
             phoneModel: item.phoneModel,
@@ -136,6 +216,9 @@ export default function CheckoutPage() {
         setLoading(false);
         return;
       }
+
+      // Clear checkout key on successful order
+      sessionStorage.removeItem("wrapy-checkout-key");
 
       clearCart();
 
@@ -206,15 +289,22 @@ export default function CheckoutPage() {
                   type="text"
                   required
                   value={form.customerName}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      customerName: e.target.value,
-                    })
-                  }
-                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                  onChange={(e) => handleChange("customerName", e.target.value)}
+                  onBlur={(e) => handleBlur("customerName", e.target.value)}
+                  className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                    touchedFields.customerName && fieldErrors.customerName
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-dark-border focus:border-brand/50"
+                  }`}
                   placeholder="Your full name"
+                  aria-invalid={touchedFields.customerName && !!fieldErrors.customerName}
+                  aria-describedby={touchedFields.customerName && fieldErrors.customerName ? "customerName-error" : undefined}
                 />
+                {touchedFields.customerName && fieldErrors.customerName && (
+                  <p id="customerName-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                    {fieldErrors.customerName}
+                  </p>
+                )}
               </div>
 
               {/* Phone + Email */}
@@ -228,15 +318,22 @@ export default function CheckoutPage() {
                     type="tel"
                     required
                     value={form.phone}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        phone: e.target.value,
-                      })
-                    }
-                    className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                    onChange={(e) => handleChange("phone", e.target.value)}
+                    onBlur={(e) => handleBlur("phone", e.target.value)}
+                    className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                      touchedFields.phone && fieldErrors.phone
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-dark-border focus:border-brand/50"
+                    }`}
                     placeholder="+216 XX XXX XXX"
+                    aria-invalid={touchedFields.phone && !!fieldErrors.phone}
+                    aria-describedby={touchedFields.phone && fieldErrors.phone ? "phone-error" : undefined}
                   />
+                  {touchedFields.phone && fieldErrors.phone && (
+                    <p id="phone-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                      {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -247,15 +344,22 @@ export default function CheckoutPage() {
                   <input
                     type="email"
                     value={form.email}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        email: e.target.value,
-                      })
-                    }
-                    className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    onBlur={(e) => handleBlur("email", e.target.value)}
+                    className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                      touchedFields.email && fieldErrors.email
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-dark-border focus:border-brand/50"
+                    }`}
                     placeholder="Optional"
+                    aria-invalid={touchedFields.email && !!fieldErrors.email}
+                    aria-describedby={touchedFields.email && fieldErrors.email ? "email-error" : undefined}
                   />
+                  {touchedFields.email && fieldErrors.email && (
+                    <p id="email-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -269,15 +373,22 @@ export default function CheckoutPage() {
                   type="text"
                   required
                   value={form.address}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      address: e.target.value,
-                    })
-                  }
-                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                  onChange={(e) => handleChange("address", e.target.value)}
+                  onBlur={(e) => handleBlur("address", e.target.value)}
+                  className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                    touchedFields.address && fieldErrors.address
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-dark-border focus:border-brand/50"
+                  }`}
                   placeholder="Street address"
+                  aria-invalid={touchedFields.address && !!fieldErrors.address}
+                  aria-describedby={touchedFields.address && fieldErrors.address ? "address-error" : undefined}
                 />
+                {touchedFields.address && fieldErrors.address && (
+                  <p id="address-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                    {fieldErrors.address}
+                  </p>
+                )}
               </div>
 
               {/* City + Postal Code */}
@@ -291,15 +402,22 @@ export default function CheckoutPage() {
                     type="text"
                     required
                     value={form.city}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        city: e.target.value,
-                      })
-                    }
-                    className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                    onChange={(e) => handleChange("city", e.target.value)}
+                    onBlur={(e) => handleBlur("city", e.target.value)}
+                    className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                      touchedFields.city && fieldErrors.city
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-dark-border focus:border-brand/50"
+                    }`}
                     placeholder="City"
+                    aria-invalid={touchedFields.city && !!fieldErrors.city}
+                    aria-describedby={touchedFields.city && fieldErrors.city ? "city-error" : undefined}
                   />
+                  {touchedFields.city && fieldErrors.city && (
+                    <p id="city-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                      {fieldErrors.city}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -310,15 +428,22 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     value={form.postalCode}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        postalCode: e.target.value,
-                      })
-                    }
-                    className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                    onChange={(e) => handleChange("postalCode", e.target.value)}
+                    onBlur={(e) => handleBlur("postalCode", e.target.value)}
+                    className={`w-full bg-dark rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none min-h-[48px] transition-colors ${
+                      touchedFields.postalCode && fieldErrors.postalCode
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-dark-border focus:border-brand/50"
+                    }`}
                     placeholder="Optional"
+                    aria-invalid={touchedFields.postalCode && !!fieldErrors.postalCode}
+                    aria-describedby={touchedFields.postalCode && fieldErrors.postalCode ? "postalCode-error" : undefined}
                   />
+                  {touchedFields.postalCode && fieldErrors.postalCode && (
+                    <p id="postalCode-error" className="text-red-400 text-xs mt-1.5" role="alert">
+                      {fieldErrors.postalCode}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -330,14 +455,9 @@ export default function CheckoutPage() {
 
                 <textarea
                   value={form.notes}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      notes: e.target.value,
-                    })
-                  }
+                  onChange={(e) => handleChange("notes", e.target.value)}
                   rows={3}
-                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 resize-none"
+                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3.5 text-base text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 resize-none min-h-[48px]"
                   placeholder="Any special instructions..."
                 />
               </div>
@@ -378,18 +498,20 @@ export default function CheckoutPage() {
             {/* =========================
                 CART ITEMS
             ========================== */}
-            <div className="space-y-4 mb-4">
+            <div className="space-y-3 mb-4">
               {items.map((item) => (
                 <div
                   key={`${item.productId}-${item.phoneModel}`}
                   className="flex gap-3"
                 >
                   {/* Product image */}
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-dark shrink-0">
-                    <img
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-dark shrink-0 relative">
+                    <Image
                       src={item.productImage || "/placeholder.jpg"}
                       alt={item.productName}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="48px"
                     />
                   </div>
 
@@ -402,9 +524,9 @@ export default function CheckoutPage() {
                     {/* PHONE MODEL */}
                     {item.phoneModel && (
                       <div className="flex items-center gap-1 mt-1">
-                        <Smartphone className="w-3 h-3 text-brand" />
+                        <Smartphone className="w-3.5 h-3.5 text-brand" />
 
-                        <p className="text-[10px] text-brand font-medium">
+                        <p className="text-xs text-brand font-medium">
                           {item.phoneModel}
                         </p>
                       </div>
@@ -428,12 +550,12 @@ export default function CheckoutPage() {
             ========================== */}
             <div className="border-t border-dark-border pt-4 mb-4">
               {couponApplied ? (
-                <div className="bg-brand/10 rounded-lg px-3 py-2">
+                <div className="bg-brand/10 rounded-lg px-3 py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Tag className="w-3.5 h-3.5 text-brand" />
+                      <Tag className="w-4 h-4 text-brand" />
 
-                      <span className="text-xs text-brand font-medium">
+                      <span className="text-sm text-brand font-medium">
                         {couponApplied.code}
                       </span>
                     </div>
@@ -441,15 +563,15 @@ export default function CheckoutPage() {
                     <button
                       type="button"
                       onClick={removeCoupon}
-                      className="text-dark-muted hover:text-white"
+                      className="text-dark-muted hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Remove coupon"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
                   {couponApplied.description && (
-                    <p className="text-[10px] text-dark-muted mt-1">
+                    <p className="text-xs text-dark-muted mt-1">
                       {couponApplied.description}
                     </p>
                   )}
@@ -463,14 +585,14 @@ export default function CheckoutPage() {
                       setCouponCode(e.target.value.toUpperCase())
                     }
                     placeholder="Coupon code"
-                    className="flex-1 bg-dark border border-dark-border rounded-lg px-3 py-2 text-xs text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+                    className="flex-1 bg-dark border border-dark-border rounded-lg px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 min-h-[48px]"
                   />
 
                   <button
                     type="button"
                     onClick={validateCoupon}
                     disabled={couponLoading || !couponCode.trim()}
-                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-lg transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
                   >
                     {couponLoading ? "..." : "Apply"}
                   </button>
@@ -504,6 +626,10 @@ export default function CheckoutPage() {
                 </span>
               </div>
 
+              {shipping === 0 && (
+                <p className="text-xs text-brand text-center">Free shipping on orders over 100 DT!</p>
+              )}
+
               {discount > 0 && (
                 <div className="flex justify-between text-brand">
                   <span>Discount</span>
@@ -532,7 +658,7 @@ export default function CheckoutPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-6 w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold py-4 rounded-xl text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-6 w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold py-4.5 rounded-xl text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
             >
               {loading ? (
                 <>

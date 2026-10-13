@@ -4,6 +4,8 @@ import { useEffect, useState, use } from "react";
 import { formatPrice } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
 
 interface OrderDetail {
   order: {
@@ -67,6 +69,44 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const { order, items } = data;
 
+  const itemColumns = [
+    {
+      key: "product",
+      header: "Product",
+      render: (item: typeof items[0]) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg overflow-hidden bg-dark shrink-0 relative">
+            {item.productImage && (
+              <Image src={item.productImage} alt="" fill className="object-cover" sizes="40px" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-white truncate">{item.productName}</p>
+            {item.phoneModel && <p className="text-xs text-dark-muted">{item.phoneModel}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      align: "center" as const,
+      render: (item: typeof items[0]) => <span className="text-sm text-white">{item.quantity}</span>,
+    },
+    {
+      key: "price",
+      header: "Price",
+      align: "right" as const,
+      render: (item: typeof items[0]) => <span className="text-sm text-white">{formatPrice(item.price)}</span>,
+    },
+    {
+      key: "total",
+      header: "Total",
+      align: "right" as const,
+      render: (item: typeof items[0]) => <span className="text-sm text-white font-medium">{formatPrice(item.total)}</span>,
+    },
+  ];
+
   return (
     <div>
       <Link href="/admin/orders" className="inline-flex items-center gap-1.5 text-sm text-dark-muted hover:text-white transition-colors mb-6">
@@ -98,23 +138,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {/* Items */}
           <div className="bg-dark-card rounded-2xl p-6 border border-dark-border">
             <h2 className="text-lg font-semibold text-white mb-4">Order Items</h2>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-4 py-3 border-b border-dark-border/50 last:border-0">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-dark shrink-0">
-                    {item.productImage && <img src={item.productImage} alt="" className="w-full h-full object-cover" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white">{item.productName}</p>
-                    {item.phoneModel && <p className="text-xs text-dark-muted">{item.phoneModel}</p>}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-white">{formatPrice(item.total)}</p>
-                    <p className="text-xs text-dark-muted">{item.quantity} × {formatPrice(item.price)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ResponsiveTable
+              items={items}
+              columns={itemColumns}
+              keyExtractor={(item) => item.id}
+              emptyMessage="No items in this order"
+              loading={false}
+              cardKeyFields={["quantity", "price", "total"]}
+            />
           </div>
         </div>
 

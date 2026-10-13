@@ -1,10 +1,11 @@
 import { db } from "@/db";
 import { orders, orderItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,18 @@ export default async function OrderSuccessPage({ params }: PageProps) {
     .limit(1);
 
   if (!order) notFound();
+
+  const session = await requireAuth();
+
+  // If user is not logged in, redirect to login with return URL
+  if (!session) {
+    redirect(`/login?redirect=/order-success/${id}`);
+  }
+
+  // Check if user owns the order or is admin
+  if (order.userId !== session.id && session.role !== "admin") {
+    notFound();
+  }
 
   const items = await db
     .select()

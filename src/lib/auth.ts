@@ -5,9 +5,11 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "wrapy-v2-secret-key-change-in-production"
-);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32) {
+  throw new Error("JWT_SECRET must be configured with at least 32 bytes.");
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecret);
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -55,6 +57,7 @@ export async function getSession() {
       name: users.name,
       email: users.email,
       phone: users.phone,
+      avatarUrl: users.avatarUrl,
       role: users.role,
       loyaltyPoints: users.loyaltyPoints,
     })

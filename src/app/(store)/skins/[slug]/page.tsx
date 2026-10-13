@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { products, collections, reviews } from "@/db/schema";
+import { products, collections } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
@@ -16,7 +16,7 @@ export default async function ProductPage({ params }: PageProps) {
   const [product] = await db
     .select()
     .from(products)
-    .where(and(eq(products.slug, slug), eq(products.isActive, true)))
+    .where(and(eq(products.slug, slug), eq(products.isActive, true), eq(products.isDeleted, false)))
     .limit(1);
 
   if (!product) notFound();
@@ -30,11 +30,6 @@ export default async function ProductPage({ params }: PageProps) {
       .limit(1);
     collectionName = col?.name || null;
   }
-
-  const productReviews = await db
-    .select()
-    .from(reviews)
-    .where(and(eq(reviews.productId, product.id), eq(reviews.isApproved, true)));
 
   // Get related products (same collection)
   const related = product.collectionId
@@ -53,7 +48,8 @@ export default async function ProductPage({ params }: PageProps) {
         .where(
           and(
             eq(products.collectionId, product.collectionId),
-            eq(products.isActive, true)
+            eq(products.isActive, true),
+            eq(products.isDeleted, false)
           )
         )
         .limit(4)
@@ -63,7 +59,6 @@ export default async function ProductPage({ params }: PageProps) {
     <ProductDetail
       product={product}
       collectionName={collectionName}
-      reviews={productReviews}
       relatedProducts={related.filter((p) => p.id !== product.id)}
     />
   );

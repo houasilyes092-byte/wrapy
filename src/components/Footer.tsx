@@ -1,23 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Camera, Mail, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
-
-type Settings = Record<string, string>;
+import { useSettings } from "@/context/settings";
 
 export default function Footer() {
-  const [settings, setSettings] = useState<Settings>({});
-
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load settings");
-        return response.json();
-      })
-      .then((data) => setSettings(data))
-      .catch(() => setSettings({}));
-  }, []);
+  const { settings } = useSettings();
 
   const logo = settings.logo_image || "";
   const instagram = settings.instagram_url || "";
@@ -36,9 +25,11 @@ export default function Footer() {
           <div>
             <Link href="/" className="inline-flex items-center mb-3">
               {logo ? (
-                <img
+                <Image
                   src={logo}
                   alt="Wrapy"
+                  width={180}
+                  height={64}
                   className="max-w-[180px] max-h-16 object-contain"
                 />
               ) : (
@@ -103,6 +94,9 @@ export default function Footer() {
             </h4>
 
             <ul className="space-y-3">
+              <li>
+                <Link href="/#faq-title" className="text-sm text-dark-muted hover:text-white transition-colors">Questions fréquentes</Link>
+              </li>
               <li>
                 <Link
                   href="/skins"

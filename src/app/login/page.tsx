@@ -87,6 +87,10 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "login" && <>
+              <a href="/auth/google/start" className="flex min-h-12 w-full items-center justify-center rounded-xl border border-dark-border text-sm font-semibold text-white transition-colors hover:border-brand/50">Continuer avec Google</a>
+              <div className="flex items-center gap-3 text-xs text-dark-muted"><span className="h-px flex-1 bg-dark-border"/>ou avec votre e-mail<span className="h-px flex-1 bg-dark-border"/></div>
+            </>}
             {mode === "register" && (
               <div>
                 <label className="text-xs text-dark-muted block mb-1.5">Full Name</label>
@@ -153,10 +157,6 @@ export default function LoginPage() {
               {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
             </button>
           </form>
-
-          <p className="text-xs text-dark-muted text-center mt-4">
-            Admin: admin@wrapy.com / admin123
-          </p>
         </div>
       </div>
     </div>

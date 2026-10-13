@@ -54,6 +54,21 @@ export async function PUT(req: NextRequest) {
       );
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "faq_items")) {
+      try {
+        const entries = JSON.parse(String(body.faq_items));
+        if (!Array.isArray(entries) || entries.length > 50 || entries.some((entry) => typeof entry?.question !== "string" || !entry.question.trim() || typeof entry?.answer !== "string" || !entry.answer.trim())) throw new Error("invalid FAQ");
+      } catch {
+        return NextResponse.json({ error: "FAQ must be valid JSON with a question and answer for each item." }, { status: 400 });
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "tutorial_video_url")) {
+      const value = body.tutorial_video_url;
+      if (typeof value !== "string" || value.length > 2000 || (value && !/^https:\/\//i.test(value) && !value.startsWith("/uploads/"))) {
+        return NextResponse.json({ error: "Use an HTTPS video URL or an uploaded /uploads/ file." }, { status: 400 });
+      }
+    }
+
     for (const [key, value] of Object.entries(body)) {
       const stringValue =
         value === null || value === undefined

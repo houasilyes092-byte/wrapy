@@ -1,9 +1,13 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import Image from "next/image";
 import { db } from "@/db";
 import { products, collections, reviews, settings } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
-import ProductCard from "@/components/ProductCard";
-import { Shield, Smartphone, Sparkles, Zap, Palette } from "lucide-react";
+import { eq, desc, and, sql } from "drizzle-orm";
+import HomeProductCarousel from "@/components/HomeProductCarousel";
+import { Shield, Smartphone, Sparkles, Zap, Palette, ChevronDown, ChevronUp } from "lucide-react";
+import { FAQSection, TutorialSection, type FaqItem } from "@/components/StoreExtras";
+import ReviewsMarquee from "@/components/ReviewsMarquee";
+import { CategoriesGrid } from "@/components/CategoriesGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +25,12 @@ export default async function HomePage() {
       collectionId: products.collectionId,
     })
     .from(products)
-    .where(eq(products.isActive, true))
-    .orderBy(desc(products.isFeatured))
+    .where(and(eq(products.isActive, true), eq(products.isDeleted, false)))
+    .orderBy(
+      desc(sql`(${products.isFeatured}::int + ${products.isBestSeller}::int)`),
+      desc(products.isFeatured),
+      desc(products.createdAt),
+    )
     .limit(8);
 
   const allCollections = await db
@@ -31,11 +39,35 @@ export default async function HomePage() {
     .where(eq(collections.isActive, true))
     .orderBy(collections.name);
 
+  const activeProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+    })
+    .from(products)
+    .where(and(eq(products.isActive, true), eq(products.isDeleted, false)))
+    .orderBy(products.name);
+
   const approvedReviews = await db
-    .select()
+    .select({
+      id: reviews.id,
+      rating: reviews.rating,
+      comment: reviews.comment,
+      title: reviews.title,
+      customerName: reviews.customerName,
+      productName: products.name,
+      phoneModel: sql<string | null>`NULL::text`.as("phoneModel"),
+      createdAt: reviews.createdAt,
+    })
     .from(reviews)
-    .where(eq(reviews.isApproved, true))
-    .limit(6);
+    .leftJoin(products, eq(reviews.productId, products.id))
+    .where(and(
+      eq(reviews.isApproved, true),
+      eq(reviews.isHomepage, true),
+      eq(products.isDeleted, false),
+    ))
+    .orderBy(desc(reviews.createdAt))
+    .limit(30);
 
   const settingRows = await db.select().from(settings);
 
@@ -45,21 +77,38 @@ export default async function HomePage() {
     siteSettings[setting.key] = setting.value;
   }
 
-  const heroImage =
-    siteSettings.hero_image || "/hero-skin.jpg";
+  const heroMedia =
+    siteSettings.hero_media || siteSettings.hero_image || "/hero-skin.jpg";
+
+  const heroMediaType =
+    siteSettings.hero_media_type ||
+    (siteSettings.hero_media?.match(/\.(mp4|webm)$/i) ? "video" : "image");
 
   const heroTitle =
     siteSettings.hero_title || "WRAP YOUR WORLD";
 
   const heroSubtitle =
     siteSettings.hero_subtitle ||
-    "{heroSubtitle}";
+    "Precision-cut vinyl skins crafted for ultimate device protection and distinct style.";
 
   const heroButtonText =
     siteSettings.hero_button_text || "Shop Skins";
 
   const heroButtonLink =
     siteSettings.hero_button_link || "/skins";
+
+  let faqItems: FaqItem[] = [];
+  try {
+    const parsed = JSON.parse(siteSettings.faq_items || "[]");
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const valid = parsed.filter((item): item is FaqItem =>
+        typeof item?.question === "string" && !!item.question.trim() &&
+        typeof item?.answer === "string" && !!item.answer.trim() &&
+        item.enabled !== false
+      );
+      if (valid.length > 0) faqItems = valid;
+    }
+  } catch { /* Keep empty or use defaults if needed */ }
 
   // Get collection names for products
   const collectionMap: Record<string, string> = {};
@@ -72,7 +121,26 @@ export default async function HomePage() {
       {/* HERO */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img src={heroImage} alt="Wrapy Hero" className="w-full h-full object-cover opacity-40" />
+          {heroMediaType === "video" || heroMedia?.match(/\.(mp4|webm)$/i) ? (
+            <video
+              src={heroMedia}
+              className="w-full h-full object-cover opacity-40"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={siteSettings.hero_poster || undefined}
+            />
+          ) : (
+            <Image
+              src={heroMedia}
+              alt="Wrapy Hero"
+              fill
+              className="object-cover opacity-40"
+              priority
+              sizes="100vw"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-dark/60 via-dark/80 to-dark" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-fade-in">
@@ -122,17 +190,10 @@ export default async function HomePage() {
             View All â†’
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-          {featuredProducts.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={{
-                ...p,
-                collectionName: p.collectionId ? collectionMap[p.collectionId] : undefined,
-              }}
-            />
-          ))}
-        </div>
+        <HomeProductCarousel products={featuredProducts.map((p) => ({
+          ...p,
+          collectionName: p.collectionId ? collectionMap[p.collectionId] : undefined,
+        }))} />
         <div className="mt-8 text-center sm:hidden">
           <Link href="/skins" className="text-sm text-brand font-medium">
             View All Products â†’
@@ -140,37 +201,16 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <ReviewsMarquee reviews={approvedReviews as any} products={activeProducts} />
+
       {/* COLLECTIONS */}
-      <section className="py-20 bg-dark-card">
+      <section id="collections" className="py-12 bg-dark-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-xs text-brand font-medium tracking-wider uppercase mb-2">Collections</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Find Your Style</h2>
+          <div className="mb-6">
+            <p className="text-xs text-brand font-medium tracking-wider uppercase mb-1.5">Collections</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Catégories</h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-            {allCollections.map((col) => (
-              <Link
-                key={col.id}
-                href={`/collections/${col.slug}`}
-                className="group relative aspect-[4/3] rounded-2xl overflow-hidden bg-dark border border-dark-border hover:border-brand/30 transition-all duration-300"
-              >
-                {col.image && (
-                  <img
-                    src={col.image}
-                    alt={col.name}
-                    className="w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-500"
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-4 left-4 right-4">
-                  <h3 className="text-lg font-bold text-white">{col.name}</h3>
-                  {col.description && (
-                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{col.description}</p>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
+          <CategoriesGrid collections={allCollections as any} />
         </div>
       </section>
 
@@ -199,30 +239,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* REVIEWS */}
-      {approvedReviews.length > 0 && (
-        <section className="py-20 bg-dark-card">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <p className="text-xs text-brand font-medium tracking-wider uppercase mb-2">Testimonials</p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Loved by Thousands</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {approvedReviews.map((rev) => (
-                <div key={rev.id} className="bg-dark rounded-2xl p-6 border border-dark-border">
-                  <div className="flex gap-1 mb-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <span key={i} className={i < rev.rating ? "text-brand" : "text-dark-border"}>â˜…</span>
-                    ))}
-                  </div>
-                  {rev.comment && <p className="text-sm text-gray-300 mb-4 leading-relaxed">{rev.comment}</p>}
-                  <p className="text-xs text-dark-muted font-medium">{rev.customerName || "Customer"}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      <TutorialSection videoUrl={siteSettings.tutorial_video_url || ""} />
+      <FAQSection items={faqItems} />
 
       {/* CTA */}
       <section className="py-24 px-4 text-center">

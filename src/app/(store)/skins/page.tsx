@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { products, collections } from "@/db/schema";
-import { eq, and, ilike, desc, asc, inArray } from "drizzle-orm";
+import { products, collections, reviews } from "@/db/schema";
+import { eq, and, ilike, desc, asc, inArray, sql } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/FilterSidebar";
 
@@ -27,7 +27,7 @@ export default async function SkinsPage({ searchParams }: PageProps) {
     .orderBy(collections.name);
 
   // Build conditions
-  const conditions = [eq(products.isActive, true)];
+  const conditions = [eq(products.isActive, true), eq(products.isDeleted, false)];
 
   if (params.featured === "true") {
     conditions.push(eq(products.isFeatured, true));
@@ -85,6 +85,22 @@ export default async function SkinsPage({ searchParams }: PageProps) {
         m.toLowerCase().includes(params.model!.toLowerCase())
       )
     );
+  }
+
+  if (params.sort === "rating" && allProducts.length) {
+    const ids = allProducts.map((product) => product.id);
+    const [prior] = await db.select({ average: sql<number>`coalesce(avg(${reviews.rating}), 0)` }).from(reviews).where(eq(reviews.isApproved, true));
+    const aggregates = await db.select({ productId: reviews.productId, average: sql<number>`avg(${reviews.rating})`, count: sql<number>`count(*)` }).from(reviews).where(and(eq(reviews.isApproved, true), inArray(reviews.productId, ids))).groupBy(reviews.productId);
+    const byProduct = new Map(aggregates.map((row) => [row.productId, { average: Number(row.average), count: Number(row.count) }]));
+    const priorMean = Number(prior?.average || 0);
+    const priorWeight = 5;
+    allProducts.sort((a, b) => {
+      const ar = byProduct.get(a.id) || { average: 0, count: 0 };
+      const br = byProduct.get(b.id) || { average: 0, count: 0 };
+      const scoreA = (ar.count * ar.average + priorWeight * priorMean) / (ar.count + priorWeight);
+      const scoreB = (br.count * br.average + priorWeight * priorMean) / (br.count + priorWeight);
+      return scoreB - scoreA || br.count - ar.count;
+    });
   }
 
   const collectionMap: Record<string, string> = {};

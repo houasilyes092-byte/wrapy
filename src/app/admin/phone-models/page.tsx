@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
 
 interface PhoneModel {
   id: string;
   brand: string;
   name: string;
   isActive: boolean;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
 export default function PhoneModelsPage() {
@@ -17,19 +27,27 @@ export default function PhoneModelsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const loadedRef = useRef(false);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
 
-  async function loadModels() {
+  async function fetchModels(page = 1) {
     try {
-      setLoading(true);
-
-      const res = await fetch("/api/admin/phone-models");
-      const data = await res.json();
+      const res = await fetch(`/api/admin/phone-models?page=${page}&limit=20`);
+      const json = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to load models");
+        throw new Error(json.error || "Failed to load models");
       }
 
-      setModels(data);
+      setModels(json.data || []);
+      setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load models");
     } finally {
@@ -38,8 +56,10 @@ export default function PhoneModelsPage() {
   }
 
   useEffect(() => {
-    loadModels();
-  }, []);
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    fetchModels(pagination.page);
+  }, [pagination.page]);
 
   async function addModel(e: React.FormEvent) {
     e.preventDefault();
@@ -98,14 +118,43 @@ export default function PhoneModelsPage() {
     }
   }
 
-  const grouped = models.reduce<Record<string, PhoneModel[]>>((acc, model) => {
-    if (!acc[model.brand]) {
-      acc[model.brand] = [];
-    }
-
-    acc[model.brand].push(model);
-    return acc;
-  }, {});
+  const columns = [
+    {
+      key: "name",
+      header: "Model",
+      render: (model: PhoneModel) => (
+        <div>
+          <p className="text-sm font-medium text-white">{model.name}</p>
+          <p className="text-xs text-dark-muted">{model.brand}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (model: PhoneModel) => (
+        <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${model.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
+          {model.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right" as const,
+      className: "w-24",
+      render: (model: PhoneModel) => (
+        <button
+          type="button"
+          onClick={() => deleteModel(model.id)}
+          className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -170,62 +219,44 @@ export default function PhoneModelsPage() {
         )}
       </form>
 
-      <div className="space-y-6">
-        {loading ? (
-          <div className="text-center py-16 text-dark-muted">
-            Loading phone models...
-          </div>
-        ) : models.length === 0 ? (
-          <div className="text-center py-16 bg-dark-card border border-dark-border rounded-2xl text-dark-muted">
-            No phone models yet.
-          </div>
-        ) : (
-          Object.entries(grouped).map(([brandName, brandModels]) => (
-            <div
-              key={brandName}
-              className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden"
+      <ResponsiveTable
+        items={models}
+        columns={columns}
+        keyExtractor={(m) => m.id}
+        emptyMessage="No phone models yet."
+        loading={loading}
+        cardKeyFields={["status", "actions"]}
+      />
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6 px-1">
+          <p className="text-sm text-dark-muted">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} models
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+              disabled={!pagination.hasPrev}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
             >
-              <div className="px-6 py-4 border-b border-dark-border">
-                <h2 className="text-lg font-semibold text-white">
-                  {brandName}
-                </h2>
-                <p className="text-xs text-dark-muted mt-1">
-                  {brandModels.length} model
-                  {brandModels.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-
-              <div className="divide-y divide-dark-border">
-                {brandModels.map((model) => (
-                  <div
-                    key={model.id}
-                    className="flex items-center justify-between px-6 py-4"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-white">
-                        {model.name}
-                      </p>
-
-                      <p className="text-xs text-dark-muted mt-1">
-                        {model.isActive ? "Active" : "Inactive"}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteModel(model.id)}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 text-sm text-white">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              disabled={!pagination.hasNext}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

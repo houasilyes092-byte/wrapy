@@ -1,28 +1,39 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useState, useRef } from "react";
 import { ShoppingBag, Menu, X, User, Heart } from "lucide-react";
 import { useCart } from "@/context/cart";
+import { useSettings } from "@/context/settings";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [logo, setLogo] = useState("");
   const { totalItems } = useCart();
+  const { settings } = useSettings();
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load settings");
-        return response.json();
-      })
-      .then((data) => {
-        setLogo(data.logo_image || "");
-      })
-      .catch(() => {
-        setLogo("");
-      });
+    function handleResize() {
+      if (window.innerWidth >= 768) setMenuOpen(false);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
+  const logo = settings.logo_image || "";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-dark/80 backdrop-blur-xl border-b border-dark-border">
@@ -32,9 +43,11 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             {logo ? (
-              <img
+              <Image
                 src={logo}
                 alt="Wrapy"
+                width={180}
+                height={48}
                 className="max-w-[150px] sm:max-w-[180px] max-h-12 object-contain"
               />
             ) : (
@@ -76,6 +89,7 @@ export default function Header() {
             <Link
               href="/account/wishlist"
               className="text-gray-400 hover:text-white transition-colors p-2"
+              aria-label="Wishlist"
             >
               <Heart className="w-5 h-5" />
             </Link>
@@ -83,6 +97,7 @@ export default function Header() {
             <Link
               href="/account"
               className="text-gray-400 hover:text-white transition-colors p-2"
+              aria-label="My Account"
             >
               <User className="w-5 h-5" />
             </Link>
@@ -90,6 +105,7 @@ export default function Header() {
             <Link
               href="/cart"
               className="relative text-gray-400 hover:text-white transition-colors p-2"
+              aria-label={`Cart (${totalItems} items)`}
             >
               <ShoppingBag className="w-5 h-5" />
 
@@ -103,6 +119,9 @@ export default function Header() {
             <button
               className="md:hidden text-gray-400 hover:text-white p-2"
               onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
             >
               {menuOpen ? (
                 <X className="w-6 h-6" />
@@ -116,7 +135,13 @@ export default function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-dark border-t border-dark-border animate-fade-in">
+        <div
+          ref={menuRef}
+          id="mobile-menu"
+          className="md:hidden bg-dark border-t border-dark-border animate-fade-in"
+          role="navigation"
+          aria-label="Mobile navigation"
+        >
           <nav className="px-4 py-6 space-y-4">
             <Link
               href="/skins"

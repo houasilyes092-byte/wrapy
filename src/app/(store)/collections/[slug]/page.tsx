@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -35,22 +36,29 @@ export default async function CollectionPage({ params }: PageProps) {
     })
     .from(products)
     .where(
-      and(eq(products.collectionId, collection.id), eq(products.isActive, true))
+      and(eq(products.collectionId, collection.id), eq(products.isActive, true), eq(products.isDeleted, false))
     );
+
+  const coverImage = collection.images?.[0];
+  const galleryImages = collection.images?.slice(1) || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
-      <div className="relative rounded-2xl overflow-hidden mb-10">
-        {collection.image && (
-          <img
-            src={collection.image}
+      <div className="relative isolate mb-10 min-h-[280px] overflow-hidden rounded-2xl bg-dark sm:min-h-[360px] lg:min-h-[420px]">
+        {coverImage && (
+          <Image
+            src={coverImage}
             alt={collection.name}
-            className="w-full h-48 sm:h-64 object-cover opacity-40"
+            fill
+            className="object-cover opacity-70"
+            priority
+            sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1300px) calc(100vw - 3rem), 1280px"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-dark via-dark/80 to-transparent flex items-center">
-          <div className="px-8">
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-dark/90 via-dark/65 to-dark/10" aria-hidden="true" />
+        <div className="relative z-10 flex min-h-[280px] items-center px-6 py-10 sm:min-h-[360px] sm:px-10 lg:min-h-[420px]">
+          <div>
             <Link href="/skins" className="text-xs text-brand mb-2 block">← All Skins</Link>
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{collection.name}</h1>
             {collection.description && (
@@ -59,6 +67,23 @@ export default async function CollectionPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Gallery Images */}
+      {galleryImages.length > 0 && (
+        <div className="mb-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {galleryImages.map((img, i) => (
+            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-dark border border-dark-border group">
+              <Image
+                src={img}
+                alt={`${collection.name} gallery ${i + 1}`}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {collectionProducts.length === 0 ? (
         <div className="text-center py-20">

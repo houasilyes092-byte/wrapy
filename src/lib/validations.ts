@@ -21,6 +21,7 @@ export const productSchema = z.object({
   images: z.array(z.string()).default([]),
   compatibleModels: z.array(z.string()).default([]),
   stock: z.number().int().min(0).default(0),
+  madeToOrder: z.boolean().default(false),
   collectionId: z.string().uuid().optional().nullable(),
   tags: z.array(z.string()).default([]),
   isBestSeller: z.boolean().default(false),
@@ -32,7 +33,7 @@ export const collectionSchema = z.object({
   name: z.string().min(1, "Name is required"),
   slug: z.string().min(1, "Slug is required"),
   description: z.string().optional(),
-  image: z.string().optional(),
+  images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
 });
 
@@ -45,6 +46,7 @@ export const checkoutSchema = z.object({
   postalCode: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
   couponCode: z.string().optional().or(z.literal("")),
+  idempotencyKey: z.string().uuid().optional(),
   items: z.array(
     z.object({
       productId: z.string().uuid(),

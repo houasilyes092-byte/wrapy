@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { orders, products, users } from "@/db/schema";
-import { eq, sql, lt, desc } from "drizzle-orm";
+import { and, eq, sql, lt, desc } from "drizzle-orm";
 import { formatPrice } from "@/lib/utils";
 import { DollarSign, ShoppingCart, Package, Users, AlertTriangle, Clock } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +24,8 @@ export default async function AdminDashboard() {
 
   const [productsCount] = await db
     .select({ count: sql<string>`COUNT(*)` })
-    .from(products);
+    .from(products)
+    .where(eq(products.isDeleted, false));
 
   const [customersCount] = await db
     .select({ count: sql<string>`COUNT(*)` })
@@ -34,7 +35,7 @@ export default async function AdminDashboard() {
   const [lowStockCount] = await db
     .select({ count: sql<string>`COUNT(*)` })
     .from(products)
-    .where(lt(products.stock, 10));
+    .where(and(lt(products.stock, 10), eq(products.isDeleted, false)));
 
   const recentOrders = await db
     .select()

@@ -27,7 +27,7 @@ export async function GET() {
     })
     .from(wishlist)
     .innerJoin(products, eq(wishlist.productId, products.id))
-    .where(eq(wishlist.userId, session.id));
+    .where(and(eq(wishlist.userId, session.id), eq(products.isDeleted, false)));
 
   return NextResponse.json(items);
 }
@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
   if (!productId) {
     return NextResponse.json({ error: "Product ID required" }, { status: 400 });
   }
+
+  const [product] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.isActive, true), eq(products.isDeleted, false)))
+    .limit(1);
+  if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
 
   // Check duplicate
   const [existing] = await db

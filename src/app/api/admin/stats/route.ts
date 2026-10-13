@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, products, users } from "@/db/schema";
-import { eq, sql, lt } from "drizzle-orm";
+import { and, eq, sql, lt } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
@@ -26,7 +26,8 @@ export async function GET() {
 
   const [totalProductsResult] = await db
     .select({ count: sql<number>`COUNT(*)` })
-    .from(products);
+    .from(products)
+    .where(eq(products.isDeleted, false));
 
   const [totalCustomersResult] = await db
     .select({ count: sql<number>`COUNT(*)` })
@@ -36,7 +37,7 @@ export async function GET() {
   const [lowStockResult] = await db
     .select({ count: sql<number>`COUNT(*)` })
     .from(products)
-    .where(lt(products.stock, 10));
+    .where(and(lt(products.stock, 10), eq(products.isDeleted, false)));
 
   return NextResponse.json({
     totalSales: Number(totalSalesResult?.total || 0),

@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import {
   Loader2,
   Upload,
@@ -9,7 +10,15 @@ import {
   Type,
   Store,
   Share2,
+  Video,
+  Trash2,
+  FileVideo,
+  Plus,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
+import { uploadFile } from "@/lib/upload-client";
 
 type Settings = Record<string, string>;
 
@@ -20,27 +29,43 @@ export default function AdminSettings() {
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    if (loadedRef.current) return;
+    loadedRef.current = true;
 
-  async function loadSettings() {
-    try {
-      const response = await fetch("/api/admin/settings");
+    let mounted = true;
 
-      if (!response.ok) {
-        throw new Error("Failed to load settings");
+    async function fetchSettings() {
+      try {
+        const response = await fetch("/api/admin/settings");
+
+        if (!response.ok) {
+          throw new Error("Failed to load settings");
+        }
+
+        const data = await response.json();
+        if (mounted) {
+          setSettings(data);
+        }
+      } catch {
+        if (mounted) {
+          setError("Failed to load settings");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
-      const data = await response.json();
-      setSettings(data);
-    } catch {
-      setError("Failed to load settings");
-    } finally {
-      setLoading(false);
     }
-  }
+
+    fetchSettings();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function updateSetting(key: string, value: string) {
     setSettings((current) => ({
@@ -49,7 +74,7 @@ export default function AdminSettings() {
     }));
   }
 
-  async function uploadImage(
+async function uploadImage(
     event: React.ChangeEvent<HTMLInputElement>,
     folder: string,
     settingKey: string
@@ -62,27 +87,12 @@ export default function AdminSettings() {
     setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", folder);
+      const url = await uploadFile("/api/admin/upload", file);
+      updateSetting(settingKey, url);
 
-      const response = await fetch(
-        "/api/admin/upload",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Upload failed"
-        );
-      }
-
-      updateSetting(settingKey, data.url);
+      // Detect and save media type
+      const isVideo = file.type.startsWith("video/");
+      updateSetting("hero_media_type", isVideo ? "video" : "image");
     } catch (err) {
       setError(
         err instanceof Error
@@ -265,7 +275,7 @@ export default function AdminSettings() {
           </div>
         </section>
 
-        {/* HERO */}
+{/* HERO */}
         <section className="bg-dark-card border border-dark-border rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center">
@@ -278,7 +288,7 @@ export default function AdminSettings() {
               </h2>
 
               <p className="text-xs text-dark-muted">
-                Main homepage hero
+                Main homepage hero - supports image (JPG, PNG, WebP) or video (MP4, WebM)
               </p>
             </div>
           </div>
@@ -286,48 +296,80 @@ export default function AdminSettings() {
           <div className="space-y-5">
             <div>
               <label className="text-xs text-dark-muted block mb-1.5">
-                Hero Image
+                Hero Media (Image or Video)
               </label>
 
-              {settings.hero_image && (
-                <div className="mb-3 rounded-xl overflow-hidden border border-dark-border bg-dark">
-                  <img
-                    src={settings.hero_image}
-                    alt="Hero"
-                    className="w-full max-h-72 object-cover"
-                  />
+              {settings.hero_media && (
+                <div className="mb-3 rounded-xl overflow-hidden border border-dark-border bg-dark relative">
+                  {settings.hero_media_type === "video" || settings.hero_media?.match(/\.(mp4|webm)$/i) ? (
+                    <video
+                      src={settings.hero_media}
+                      className="w-full max-h-72 object-cover"
+                      controls
+                      muted
+                      autoPlay
+                      loop
+                      playsInline
+                    />
+) : (
+                      <Image
+                        src={settings.hero_media}
+                        alt="Hero"
+                        width={800}
+                        height={450}
+                        className="w-full max-h-72 object-cover"
+                      />
+                    )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateSetting("hero_media", "");
+                      updateSetting("hero_media_type", "");
+                    }}
+                    className="absolute top-2 right-2 w-8 h-8 bg-red-500/90 text-white rounded-full flex items-center justify-center hover:bg-red-500 transition-colors"
+                    aria-label="Remove hero media"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               )}
 
               <label className="flex items-center justify-center gap-2 border border-dashed border-dark-border rounded-xl p-5 cursor-pointer hover:border-brand/50 transition-colors">
-                {uploading === "hero_image" ? (
+                {uploading === "hero_media" ? (
                   <Loader2 className="w-5 h-5 animate-spin text-brand" />
-                ) : (
+                ) : settings.hero_media ? (
                   <Upload className="w-5 h-5 text-brand" />
+                ) : (
+                  <>
+                    <ImageIcon className="w-5 h-5 text-brand" />
+                    <FileVideo className="w-5 h-5 text-brand" />
+                  </>
                 )}
 
                 <span className="text-sm text-white">
-                  {uploading === "hero_image"
+                  {uploading === "hero_media"
                     ? "Uploading..."
-                    : "Upload Hero Image"}
+                    : settings.hero_media
+                    ? "Replace Hero Media"
+                    : "Upload Hero Image or Video"}
                 </span>
 
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm"
                   className="hidden"
                   onChange={(e) =>
                     uploadImage(
                       e,
                       "hero",
-                      "hero_image"
+                      "hero_media"
                     )
                   }
                 />
               </label>
 
               <p className="text-[11px] text-dark-muted mt-2">
-                Stored locally in public/site/hero/
+                Max 50MB. Supports JPG, PNG, WebP, MP4, WebM.
               </p>
             </div>
 
@@ -428,11 +470,13 @@ export default function AdminSettings() {
             </div>
           </div>
 
-          {settings.logo_image && (
+{settings.logo_image && (
             <div className="mb-4 w-fit p-5 rounded-xl bg-dark border border-dark-border">
-              <img
+              <Image
                 src={settings.logo_image}
                 alt="Logo"
+                width={220}
+                height={80}
                 className="max-w-[220px] max-h-20 object-contain"
               />
             </div>
@@ -524,6 +568,137 @@ export default function AdminSettings() {
                 )
               }
             />
+          </div>
+        </section>
+
+        {/* TEXT */}
+        <section className="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Tutoriel et FAQ</h2>
+            <p className="mb-5 mt-1 text-xs text-dark-muted">
+              Gérez vos questions fréquentes directement ici. Activez/désactivez, réordonnez, ajoutez, modifiez ou supprimez les éléments.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <TextInput label="URL vidéo : comment appliquer votre skin" value={settings.tutorial_video_url || ""} onChange={(value) => updateSetting("tutorial_video_url", value)} placeholder="URL fournie par votre hébergement vidéo" />
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-dark-muted">Questions fréquentes</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const current = JSON.parse(settings.faq_items || "[]");
+                      current.push({ question: "", answer: "", enabled: true });
+                      updateSetting("faq_items", JSON.stringify(current));
+                    } catch {
+                      updateSetting("faq_items", JSON.stringify([{ question: "", answer: "", enabled: true }]));
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand/20"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Ajouter
+                </button>
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  let items: Array<{ question: string; answer: string; enabled?: boolean }> = [];
+                  try {
+                    items = JSON.parse(settings.faq_items || "[]");
+                  } catch {
+                    items = [];
+                  }
+                  return items.map((item, idx) => (
+                    <div key={idx} className="rounded-xl border border-dark-border bg-dark p-3">
+                      <div className="flex items-start gap-2">
+                        <GripVertical className="mt-2 h-4 w-4 text-dark-muted" />
+                        <div className="flex-1 space-y-2">
+                          <input
+                            value={item.question}
+                            onChange={(e) => {
+                              const current = JSON.parse(settings.faq_items || "[]");
+                              current[idx].question = e.target.value;
+                              updateSetting("faq_items", JSON.stringify(current));
+                            }}
+                            placeholder="Question"
+                            className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50"
+                          />
+                          <textarea
+                            value={item.answer}
+                            onChange={(e) => {
+                              const current = JSON.parse(settings.faq_items || "[]");
+                              current[idx].answer = e.target.value;
+                              updateSetting("faq_items", JSON.stringify(current));
+                            }}
+                            placeholder="Réponse"
+                            rows={2}
+                            className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50 resize-none"
+                          />
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-xs text-dark-muted">
+                              <input
+                                type="checkbox"
+                                checked={item.enabled !== false}
+                                onChange={(e) => {
+                                  const current = JSON.parse(settings.faq_items || "[]");
+                                  current[idx].enabled = e.target.checked;
+                                  updateSetting("faq_items", JSON.stringify(current));
+                                }}
+                                className="accent-brand"
+                              />
+                              Activé
+                            </label>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => {
+                                  const current = JSON.parse(settings.faq_items || "[]");
+                                  const tmp = current[idx - 1];
+                                  current[idx - 1] = current[idx];
+                                  current[idx] = tmp;
+                                  updateSetting("faq_items", JSON.stringify(current));
+                                }}
+                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-dark-muted hover:text-white disabled:opacity-30"
+                                aria-label="Move up"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === items.length - 1}
+                                onClick={() => {
+                                  const current = JSON.parse(settings.faq_items || "[]");
+                                  const tmp = current[idx + 1];
+                                  current[idx + 1] = current[idx];
+                                  current[idx] = tmp;
+                                  updateSetting("faq_items", JSON.stringify(current));
+                                }}
+                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-dark-muted hover:text-white disabled:opacity-30"
+                                aria-label="Move down"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = JSON.parse(settings.faq_items || "[]");
+                                  current.splice(idx, 1);
+                                  updateSetting("faq_items", JSON.stringify(current));
+                                }}
+                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-red-400 hover:bg-red-400/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
           </div>
         </section>
 

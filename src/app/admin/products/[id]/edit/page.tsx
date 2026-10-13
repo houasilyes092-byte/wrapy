@@ -13,6 +13,7 @@ interface Product {
   images: string[];
   compatibleModels: string[];
   stock: number;
+  madeToOrder: boolean;
   collectionId: string | null;
   tags: string[];
   isBestSeller: boolean;

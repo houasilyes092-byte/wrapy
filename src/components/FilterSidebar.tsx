@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
+import { useState } from "react";
 import { ALL_PHONE_MODELS, PHONE_MODELS } from "@/lib/constants";
 
 interface FilterSidebarProps {
@@ -16,6 +17,7 @@ export default function FilterSidebar({ collections }: FilterSidebarProps) {
   const currentModel = searchParams.get("model") || "";
   const currentSort = searchParams.get("sort") || "";
   const currentQ = searchParams.get("q") || "";
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -28,6 +30,7 @@ export default function FilterSidebar({ collections }: FilterSidebarProps) {
     if (key !== "featured") params.delete("featured");
     if (key !== "bestseller") params.delete("bestseller");
     router.push(`/skins?${params.toString()}`);
+    if (key === "collection") setCollectionsOpen(false);
   }
 
   return (
@@ -57,6 +60,7 @@ export default function FilterSidebar({ collections }: FilterSidebarProps) {
         >
           <option value="">Recommended</option>
           <option value="newest">Newest</option>
+          <option value="rating">Best rated</option>
           <option value="price-asc">Price: Low → High</option>
           <option value="price-desc">Price: High → Low</option>
         </select>
@@ -64,28 +68,41 @@ export default function FilterSidebar({ collections }: FilterSidebarProps) {
 
       {/* Collection */}
       <div>
-        <label className="text-xs text-dark-muted uppercase tracking-wider font-medium block mb-2">Collection</label>
-        <div className="space-y-1">
-          <button
-            onClick={() => updateParam("collection", "")}
-            className={`block w-full text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-              !currentCollection ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-white"
-            }`}
-          >
-            All Collections
-          </button>
-          {collections.map((col) => (
+        <button
+          type="button"
+          aria-expanded={collectionsOpen}
+          onClick={() => setCollectionsOpen((open) => !open)}
+          className="flex min-h-11 w-full items-center justify-between rounded-xl border border-dark-border bg-dark-card px-3 text-left"
+        >
+          <span>
+            <span className="block text-xs font-medium uppercase tracking-wider text-dark-muted">Collection</span>
+            <span className="block pt-1 text-sm text-white">
+              {collections.find((collection) => collection.slug === currentCollection)?.name || "All Collections"}
+            </span>
+          </span>
+          <ChevronDown className={`h-4 w-4 text-brand transition-transform ${collectionsOpen ? "rotate-180" : ""}`} />
+        </button>
+        {collectionsOpen && (
+          <div className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-2">
             <button
-              key={col.id}
-              onClick={() => updateParam("collection", col.slug)}
-              className={`block w-full text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                currentCollection === col.slug ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-white"
-              }`}
+              onClick={() => updateParam("collection", "")}
+              aria-current={!currentCollection ? "true" : undefined}
+              className={`block min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${!currentCollection ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-white"}`}
             >
-              {col.name}
+              All Skins
             </button>
-          ))}
-        </div>
+            {collections.map((col) => (
+              <button
+                key={col.id}
+                onClick={() => updateParam("collection", col.slug)}
+                aria-current={currentCollection === col.slug ? "true" : undefined}
+                className={`block min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${currentCollection === col.slug ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-white"}`}
+              >
+                {col.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Phone model */}

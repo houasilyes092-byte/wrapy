@@ -1,9 +1,9 @@
 ﻿@import "tailwindcss";
 
 @theme {
-  --color-brand: var(--site-brand, #39ff14);
-  --color-brand-dark: var(--site-brand-dark, #2bcc0f);
-  --color-dark: var(--site-background, #0a0a0a);
+  --color-brand: var(--site-brand, #B6EA41);
+  --color-brand-dark: var(--site-brand-dark, #9cd634);
+  --color-dark: var(--site-background, #060606);
   --color-dark-card: #141414;
   --color-dark-border: #262626;
   --color-dark-muted: #737373;
@@ -42,8 +42,41 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(57, 255, 20, 0.1); }
-  50% { box-shadow: 0 0 40px rgba(57, 255, 20, 0.2); }
+  0%, 100% { box-shadow: 0 0 20px rgba(182, 234, 65, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(182, 234, 65, 0.2); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes home-products-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-50% - 0.5rem)); }
+}
+
+.home-products-animated { animation: home-products-scroll 42s linear infinite; }
+.home-products-animated:hover { animation-play-state: paused; }
+.home-products-viewport { scrollbar-width: none; }
+.home-products-viewport::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-products-animated { animation: none; }
+}
+
+/* Keep controls that normally appear on hover available to touch users. */
+@media (hover: none) {
+  .touch-visible-action { opacity: 1 !important; }
+}
+
+@media (pointer: coarse) {
+  .home-products-viewport { overflow-x: auto; }
 }
 
 .animate-fade-in {
@@ -58,8 +91,67 @@ body {
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-pulse-glow,
+  .animate-spin,
+  .animate-bounce,
+  .animate-ping,
+  .reviews-marquee-track {
+    animation: none !important;
+    transition: none !important;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
+
+/* Touch target minimum size */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--site-brand, #B6EA41);
+  outline-offset: 2px;
+}
+
+/* Prevent horizontal overflow */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Responsive images */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Text selection */
+::selection {
+  background: var(--site-brand, #B6EA41);
+  color: #000;
+}
 

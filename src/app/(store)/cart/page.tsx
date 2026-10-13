@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCart } from "@/context/cart";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, calculateShipping, DEFAULT_SHIPPING_PRICE } from "@/lib/utils";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, totalItems } = useCart();
+  const shipping = calculateShipping(subtotal, DEFAULT_SHIPPING_PRICE);
+  const total = subtotal + shipping;
 
   if (items.length === 0) {
     return (
@@ -16,7 +19,7 @@ export default function CartPage() {
         <p className="text-dark-muted mb-8">Browse our collection and find something you love.</p>
         <Link
           href="/skins"
-          className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold px-8 py-4 rounded-xl text-sm uppercase tracking-wider transition-all"
+          className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold px-8 py-4 rounded-xl text-sm uppercase tracking-wider transition-all min-h-[52px]"
         >
           Shop Skins
           <ArrowRight className="w-4 h-4" />
@@ -40,11 +43,13 @@ export default function CartPage() {
               className="flex gap-4 bg-dark-card rounded-2xl p-4 border border-dark-border"
             >
               <Link href={`/skins/${item.slug}`} className="shrink-0">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-dark">
-                  <img
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-dark relative">
+                  <Image
                     src={item.productImage || "/placeholder.jpg"}
                     alt={item.productName}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 80px, 96px"
                   />
                 </div>
               </Link>
@@ -63,23 +68,25 @@ export default function CartPage() {
                   <div className="inline-flex items-center bg-dark border border-dark-border rounded-lg">
                     <button
                       onClick={() => updateQuantity(item.productId, item.phoneModel, item.quantity - 1)}
-                      className="px-2.5 py-1.5 text-gray-400 hover:text-white transition-colors"
+                      className="px-3.5 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <Minus className="w-4 h-4" />
                     </button>
-                    <span className="px-3 py-1.5 text-sm text-white font-medium">{item.quantity}</span>
+                    <span className="px-4 py-2.5 text-sm text-white font-medium min-w-[40px] text-center">
+                      {item.quantity}
+                    </span>
                     <button
                       onClick={() => updateQuantity(item.productId, item.phoneModel, item.quantity + 1)}
-                      className="px-2.5 py-1.5 text-gray-400 hover:text-white transition-colors"
+                      className="px-3.5 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   <button
                     onClick={() => removeItem(item.productId, item.phoneModel)}
-                    className="text-dark-muted hover:text-red-400 transition-colors p-1.5"
+                    className="text-dark-muted hover:text-red-400 transition-colors p-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -88,7 +95,7 @@ export default function CartPage() {
         </div>
 
         {/* Summary */}
-        <div className="bg-dark-card rounded-2xl p-6 border border-dark-border h-fit sticky top-24">
+        <div className="bg-dark-card rounded-2xl p-6 border border-dark-border h-fit sticky top-24 lg:sticky">
           <h2 className="text-lg font-bold text-white mb-4">Order Summary</h2>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between text-gray-400">
@@ -97,16 +104,19 @@ export default function CartPage() {
             </div>
             <div className="flex justify-between text-gray-400">
               <span>Shipping</span>
-              <span className="text-white">{formatPrice(8000)}</span>
+              <span className="text-white">{formatPrice(shipping)}</span>
             </div>
+            {shipping === 0 && (
+              <p className="text-xs text-brand text-center">Free shipping on orders over 100 DT!</p>
+            )}
             <div className="border-t border-dark-border pt-3 flex justify-between text-white font-bold text-base">
               <span>Total</span>
-              <span>{formatPrice(subtotal + 8000)}</span>
+              <span>{formatPrice(total)}</span>
             </div>
           </div>
           <Link
             href="/checkout"
-            className="mt-6 w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold py-4 rounded-xl text-sm uppercase tracking-wider transition-all"
+            className="mt-6 w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-black font-bold py-4 rounded-xl text-sm uppercase tracking-wider transition-all min-h-[52px]"
           >
             Checkout
             <ArrowRight className="w-4 h-4" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 export interface CartItem {
   productId: string;
@@ -25,26 +25,28 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("wrapy-cart");
-    if (stored) {
-      try {
-        setItems(JSON.parse(stored));
-      } catch {
-        // ignore
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("wrapy-cart");
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          // ignore
+        }
       }
     }
-    setLoaded(true);
-  }, []);
+    return [];
+  });
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem("wrapy-cart", JSON.stringify(items));
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-  }, [items, loaded]);
+    localStorage.setItem("wrapy-cart", JSON.stringify(items));
+  }, [items]);
 
   const addItem = useCallback((item: CartItem) => {
     setItems((prev) => {

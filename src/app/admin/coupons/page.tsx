@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
 
 interface Coupon {
   id: string;
@@ -14,20 +15,50 @@ interface Coupon {
   isActive: boolean;
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 export default function AdminCoupons() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [form, setForm] = useState({ code: "", type: "percentage" as string, value: 0, maxUses: 0, expiresAt: "", isActive: true });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
 
-  useEffect(() => { loadCoupons(); }, []);
-
-  async function loadCoupons() {
-    const res = await fetch("/api/admin/coupons");
-    setCoupons(await res.json());
-    setLoading(false);
-  }
+  useEffect(() => {
+    let mounted = true;
+    const page = pagination.page;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    fetch(`/api/admin/coupons?page=${page}&limit=20`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!mounted) return;
+        setCoupons(json.data || []);
+        setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
+      })
+      .catch((err) => {
+        if (mounted) console.error("Failed to load coupons:", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [pagination.page]);
 
   function openNew() {
     setEditing(null);
@@ -63,7 +94,13 @@ export default function AdminCoupons() {
     });
 
     setShowForm(false);
-    loadCoupons();
+    // Re-fetch coupons for current page
+    fetch(`/api/admin/coupons?page=${pagination.page}&limit=20`)
+      .then((res) => res.json())
+      .then((json) => {
+        setCoupons(json.data || []);
+        setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
+      });
   }
 
   async function handleDelete(id: string) {
@@ -71,6 +108,50 @@ export default function AdminCoupons() {
     await fetch(`/api/admin/coupons?id=${id}`, { method: "DELETE" });
     setCoupons((prev) => prev.filter((c) => c.id !== id));
   }
+
+  const columns = [
+    {
+      key: "code",
+      header: "Code",
+      render: (c: Coupon) => <span className="text-sm text-white font-mono">{c.code}</span>,
+    },
+    {
+      key: "type",
+      header: "Type",
+      render: (c: Coupon) => <span className="text-sm text-dark-muted capitalize">{c.type}</span>,
+    },
+    {
+      key: "value",
+      header: "Value",
+      render: (c: Coupon) => <span className="text-sm text-white">{c.type === "percentage" ? `${c.value}%` : `${(c.value / 1000).toFixed(1)} DT`}</span>,
+    },
+    {
+      key: "usage",
+      header: "Usage",
+      render: (c: Coupon) => <span className="text-sm text-dark-muted">{c.usedCount}/{c.maxUses || "∞"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (c: Coupon) => (
+        <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${c.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
+          {c.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right" as const,
+      className: "w-24",
+      render: (c: Coupon) => (
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={() => openEdit(c)} className="text-dark-muted hover:text-white transition-colors p-2"><Pencil className="w-4 h-4" /></button>
+          <button onClick={() => handleDelete(c.id)} className="text-dark-muted hover:text-red-400 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -126,47 +207,44 @@ export default function AdminCoupons() {
         </div>
       )}
 
-      <div className="bg-dark-card rounded-2xl border border-dark-border overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-dark-muted">Loading...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-dark-border">
-                  <th className="text-left text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Code</th>
-                  <th className="text-left text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Type</th>
-                  <th className="text-left text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Value</th>
-                  <th className="text-left text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Usage</th>
-                  <th className="text-left text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Status</th>
-                  <th className="text-right text-xs text-dark-muted font-medium px-4 py-3 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {coupons.map((c) => (
-                  <tr key={c.id} className="border-b border-dark-border/50 hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-sm text-white font-mono">{c.code}</td>
-                    <td className="px-4 py-3 text-sm text-dark-muted capitalize">{c.type}</td>
-                    <td className="px-4 py-3 text-sm text-white">{c.type === "percentage" ? `${c.value}%` : `${(c.value / 1000).toFixed(1)} DT`}</td>
-                    <td className="px-4 py-3 text-sm text-dark-muted">{c.usedCount}/{c.maxUses || "∞"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${c.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
-                        {c.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(c)} className="text-dark-muted hover:text-white transition-colors p-2"><Pencil className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(c.id)} className="text-dark-muted hover:text-red-400 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <ResponsiveTable
+        items={coupons}
+        columns={columns}
+        keyExtractor={(c) => c.id}
+        emptyMessage="No coupons yet"
+        loading={loading}
+        cardKeyFields={["type", "value", "usage", "status", "actions"]}
+      />
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6 px-1">
+          <p className="text-sm text-dark-muted">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} coupons
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+              disabled={!pagination.hasPrev}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 text-sm text-white">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              disabled={!pagination.hasNext}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,9 +7,6 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
-console.log("DATABASE HOST:", new URL(databaseUrl).hostname);
-console.log("DATABASE PORT:", new URL(databaseUrl).port);
-
 const globalForDb = globalThis as typeof globalThis & {
   __wrapyPostgresPool?: Pool;
 };
@@ -18,10 +15,8 @@ export const pool =
   globalForDb.__wrapyPostgresPool ??
   new Pool({
     connectionString: databaseUrl,
-    ssl: {
-      rejectUnauthorized: false,
-    },
-    max: 5,
+    ssl: { rejectUnauthorized: true },
+    max: 1,
     connectionTimeoutMillis: 10000,
   });
 

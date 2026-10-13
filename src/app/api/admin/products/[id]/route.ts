@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { products } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { productSchema } from "@/lib/validations";
+import { revalidatePath } from "next/cache";
 
 export async function PUT(
   req: NextRequest,
@@ -40,6 +41,7 @@ export async function PUT(
         images: data.images,
         compatibleModels: data.compatibleModels,
         stock: data.stock,
+        madeToOrder: data.madeToOrder,
         collectionId: data.collectionId || null,
         tags: data.tags,
         isBestSeller: data.isBestSeller,
@@ -47,7 +49,7 @@ export async function PUT(
         isActive: data.isActive,
         updatedAt: new Date(),
       })
-      .where(eq(products.id, id))
+      .where(and(eq(products.id, id), eq(products.isDeleted, false)))
       .returning();
 
     if (!product) {
@@ -72,9 +74,28 @@ export async function DELETE(
 
   const { id } = await params;
 
-  await db.delete(products).where(eq(products.id, id));
+  try {
+    const [deleted] = await db
+      .update(products)
+      .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+      .where(and(eq(products.id, id), eq(products.isDeleted, false)))
+      .returning({ id: products.id });
 
-  return NextResponse.json({ success: true });
+    if (!deleted) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    revalidatePath("/", "page");
+    revalidatePath("/skins", "page");
+    revalidatePath("/skins/[slug]", "page");
+    revalidatePath("/collections/[slug]", "page");
+    revalidatePath("/admin/products", "page");
+
+    return NextResponse.json({ success: true, deleted: true });
+  } catch (error) {
+    console.error("Delete product error:", error);
+    return NextResponse.json({ error: "Unable to delete product" }, { status: 500 });
+  }
 }
 
 export async function GET(
@@ -91,7 +112,7 @@ export async function GET(
   const [product] = await db
     .select()
     .from(products)
-    .where(eq(products.id, id))
+    .where(and(eq(products.id, id), eq(products.isDeleted, false)))
     .limit(1);
 
   if (!product) {

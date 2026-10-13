@@ -1,33 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { collections, products, users, orders, orderItems, reviews, wishlist } from "./schema";
-
-export const productsRelations = relations(products, ({one, many}) => ({
-	collection: one(collections, {
-		fields: [products.collectionId],
-		references: [collections.id]
-	}),
-	orderItems: many(orderItems),
-	reviews: many(reviews),
-	wishlists: many(wishlist),
-}));
-
-export const collectionsRelations = relations(collections, ({many}) => ({
-	products: many(products),
-}));
-
-export const ordersRelations = relations(orders, ({one, many}) => ({
-	user: one(users, {
-		fields: [orders.userId],
-		references: [users.id]
-	}),
-	orderItems: many(orderItems),
-}));
-
-export const usersRelations = relations(users, ({many}) => ({
-	orders: many(orders),
-	reviews: many(reviews),
-	wishlists: many(wishlist),
-}));
+import { orders, orderItems, products, collections, users, reviews, wishlist, rewardRedemptions, loyaltyTransactions } from "./schema";
 
 export const orderItemsRelations = relations(orderItems, ({one}) => ({
 	order: one(orders, {
@@ -38,6 +10,39 @@ export const orderItemsRelations = relations(orderItems, ({one}) => ({
 		fields: [orderItems.productId],
 		references: [products.id]
 	}),
+}));
+
+export const ordersRelations = relations(orders, ({one, many}) => ({
+	orderItems: many(orderItems),
+	user: one(users, {
+		fields: [orders.userId],
+		references: [users.id]
+	}),
+	rewardRedemptions: many(rewardRedemptions),
+	loyaltyTransactions: many(loyaltyTransactions),
+}));
+
+export const productsRelations = relations(products, ({one, many}) => ({
+	orderItems: many(orderItems),
+	collection: one(collections, {
+		fields: [products.collectionId],
+		references: [collections.id]
+	}),
+	reviews: many(reviews),
+	wishlists: many(wishlist),
+	rewardRedemptions: many(rewardRedemptions),
+}));
+
+export const collectionsRelations = relations(collections, ({many}) => ({
+	products: many(products),
+}));
+
+export const usersRelations = relations(users, ({many}) => ({
+	orders: many(orders),
+	reviews: many(reviews),
+	wishlists: many(wishlist),
+	rewardRedemptions: many(rewardRedemptions),
+	loyaltyTransactions: many(loyaltyTransactions),
 }));
 
 export const reviewsRelations = relations(reviews, ({one}) => ({
@@ -58,6 +63,32 @@ export const wishlistRelations = relations(wishlist, ({one}) => ({
 	}),
 	user: one(users, {
 		fields: [wishlist.userId],
+		references: [users.id]
+	}),
+}));
+
+export const rewardRedemptionsRelations = relations(rewardRedemptions, ({one}) => ({
+	order: one(orders, {
+		fields: [rewardRedemptions.orderId],
+		references: [orders.id]
+	}),
+	product: one(products, {
+		fields: [rewardRedemptions.productId],
+		references: [products.id]
+	}),
+	user: one(users, {
+		fields: [rewardRedemptions.userId],
+		references: [users.id]
+	}),
+}));
+
+export const loyaltyTransactionsRelations = relations(loyaltyTransactions, ({one}) => ({
+	order: one(orders, {
+		fields: [loyaltyTransactions.orderId],
+		references: [orders.id]
+	}),
+	user: one(users, {
+		fields: [loyaltyTransactions.userId],
 		references: [users.id]
 	}),
 }));

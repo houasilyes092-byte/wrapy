@@ -8,6 +8,7 @@ import {
   timestamp,
   json,
   pgEnum,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // Enums
@@ -24,6 +25,13 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "cash_on_delivery",
 ]);
 export const couponTypeEnum = pgEnum("coupon_type", ["percentage", "fixed"]);
+export const heroMediaTypeEnum = pgEnum("hero_media_type", ["image", "video"]);
+export const loyaltyTransactionTypeEnum = pgEnum("loyalty_transaction_type", [
+  "earned",
+  "redeemed",
+  "reward_redeemed",
+]);
+export const rewardStatusEnum = pgEnum("reward_status", ["available", "redeemed", "expired"]);
 
 // Users
 export const users = pgTable("users", {
@@ -31,9 +39,12 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   phone: varchar("phone", { length: 50 }),
+  avatarUrl: varchar("avatar_url", { length: 500 }),
   passwordHash: text("password_hash").notNull(),
   role: userRoleEnum("role").default("customer").notNull(),
   loyaltyPoints: integer("loyalty_points").default(0).notNull(),
+  loyaltyPointsEarned: integer("loyalty_points_earned").default(0).notNull(),
+  loyaltyPointsRedeemed: integer("loyalty_points_redeemed").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -44,7 +55,7 @@ export const collections = pgTable("collections", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   description: text("description"),
-  image: varchar("image", { length: 500 }),
+  images: json("images").$type<string[]>().default([]).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -60,11 +71,13 @@ export const products = pgTable("products", {
   images: json("images").$type<string[]>().default([]).notNull(),
   compatibleModels: json("compatible_models").$type<string[]>().default([]).notNull(),
   stock: integer("stock").default(0).notNull(),
+  madeToOrder: boolean("made_to_order").default(false).notNull(),
   collectionId: uuid("collection_id").references(() => collections.id),
   tags: json("tags").$type<string[]>().default([]).notNull(),
   isBestSeller: boolean("is_best_seller").default(false).notNull(),
   isFeatured: boolean("is_featured").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -83,10 +96,13 @@ export const orders = pgTable("orders", {
   subtotal: integer("subtotal").notNull(),
   shippingPrice: integer("shipping_price").notNull(),
   discount: integer("discount").default(0).notNull(),
+  loyaltyDiscount: integer("loyalty_discount").default(0).notNull(),
   total: integer("total").notNull(),
   status: orderStatusEnum("status").default("pending").notNull(),
   paymentMethod: paymentMethodEnum("payment_method").default("cash_on_delivery").notNull(),
   couponCode: varchar("coupon_code", { length: 100 }),
+  loyaltyPointsUsed: integer("loyalty_points_used").default(0).notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 100 }).unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -123,11 +139,13 @@ export const reviews = pgTable("reviews", {
   productId: uuid("product_id").references(() => products.id).notNull(),
   userId: uuid("user_id").references(() => users.id),
   customerName: varchar("customer_name", { length: 255 }),
+  title: varchar("title", { length: 255 }),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   isApproved: boolean("is_approved").default(false).notNull(),
+  isHomepage: boolean("is_homepage").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({ userProductUnique: uniqueIndex("reviews_user_product_unique").on(table.userId, table.productId) }));
 
 // Wishlist
 export const wishlist = pgTable("wishlist", {
@@ -144,11 +162,35 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
 // Phone Models
 export const phoneModels = pgTable("phone_models", {
   id: uuid("id").defaultRandom().primaryKey(),
   brand: varchar("brand", { length: 100 }).notNull(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Loyalty Transactions
+export const loyaltyTransactions = pgTable("loyalty_transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  type: loyaltyTransactionTypeEnum("type").notNull(),
+  points: integer("points").notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Reward Redemptions (for 300-point free skin)
+export const rewardRedemptions = pgTable("reward_redemptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  productId: uuid("product_id").references(() => products.id),
+  phoneModel: varchar("phone_model", { length: 255 }).notNull(),
+  pointsUsed: integer("points_used").default(300).notNull(),
+  status: rewardStatusEnum("status").default("redeemed").notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

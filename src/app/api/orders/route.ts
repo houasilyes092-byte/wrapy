@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, orderItems, products, coupons, settings, users } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
 import { checkoutSchema } from "@/lib/validations";
 import { getSession } from "@/lib/auth";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/utils";
+import { eq, and, sql } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,14 +19,20 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    const idempotencyKey = data.idempotencyKey;
 
-    // Get shipping price from settings
-    const [shippingSetting] = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, "shipping_price"))
-      .limit(1);
-    const shippingPrice = shippingSetting ? parseInt(shippingSetting.value) : 8000;
+    // Check for existing order with same idempotency key (duplicate submission prevention)
+    if (idempotencyKey) {
+      const [existingOrder] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.idempotencyKey, idempotencyKey))
+        .limit(1);
+
+      if (existingOrder) {
+        return NextResponse.json({ orderId: existingOrder.id, duplicate: true });
+      }
+    }
 
     // Validate each product and calculate subtotal server-side
     let subtotal = 0;
@@ -37,13 +44,14 @@ export async function POST(req: NextRequest) {
       quantity: number;
       price: number;
       total: number;
+      madeToOrder: boolean;
     }[] = [];
 
     for (const item of data.items) {
       const [product] = await db
         .select()
         .from(products)
-        .where(and(eq(products.id, item.productId), eq(products.isActive, true)))
+        .where(and(eq(products.id, item.productId), eq(products.isActive, true), eq(products.isDeleted, false)))
         .limit(1);
 
       if (!product) {
@@ -53,7 +61,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (product.stock < item.quantity) {
+      if (!product.madeToOrder && product.stock < item.quantity) {
         return NextResponse.json(
           { error: `Insufficient stock for ${product.name}` },
           { status: 400 }
@@ -81,8 +89,18 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
         price: product.price,
         total: itemTotal,
+        madeToOrder: product.madeToOrder,
       });
     }
+
+    // Get shipping price from settings (after subtotal is known)
+    const [shippingSetting] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "shipping_price"))
+      .limit(1);
+    const shippingPriceSetting = shippingSetting ? parseInt(shippingSetting.value) : 8000;
+    const shippingPrice = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : shippingPriceSetting;
 
     // Validate coupon
     let discount = 0;
@@ -151,6 +169,7 @@ export async function POST(req: NextRequest) {
         status: "pending",
         paymentMethod: "cash_on_delivery",
         couponCode,
+        idempotencyKey: idempotencyKey || null,
       })
       .returning();
 
@@ -170,6 +189,7 @@ export async function POST(req: NextRequest) {
 
     // Update stock
     for (const item of validatedItems) {
+      if (item.madeToOrder) continue;
       await db
         .update(products)
         .set({ stock: sql`${products.stock} - ${item.quantity}` })

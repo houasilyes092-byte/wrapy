@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import { User, Package, Heart, Star } from "lucide-react";
+import AccountProfile from "@/components/AccountProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export default async function AccountPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <h1 className="text-3xl font-bold text-white tracking-tight mb-8">My Account</h1>
+
+      <AccountProfile initialName={session.name} initialPhone={session.phone} initialAvatar={session.avatarUrl} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-dark-card rounded-2xl p-5 border border-dark-border">

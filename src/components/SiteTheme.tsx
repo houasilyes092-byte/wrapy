@@ -1,31 +1,18 @@
 ﻿"use client";
 
-import { useEffect } from "react";
+import { useSettings } from "@/context/settings";
 
 export default function SiteTheme() {
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load settings");
-        return response.json();
-      })
-      .then((settings) => {
-        const root = document.documentElement;
+  const { loading } = useSettings();
 
-        if (settings.primary_color) {
-          root.style.setProperty("--site-brand", settings.primary_color);
-        }
-
-        if (settings.background_color) {
-          root.style.setProperty("--site-background", settings.background_color);
-        }
-
-        if (settings.text_color) {
-          root.style.setProperty("--site-text", settings.text_color);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  // Theme is applied in SettingsProvider, this component just prevents flash
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-dark flex items-center justify-center" aria-hidden="true">
+        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return null;
 }

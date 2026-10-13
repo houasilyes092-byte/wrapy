@@ -1,8 +1,18 @@
 ﻿node_modules/
 .next/
-.env
-.env.local
-.env.*.local
+.env*
 !.env.example
+.vercel/
+.turbo/
+coverage/
+*.tsbuildinfo
 *.log
 npm-debug.log*
+
+# Local one-off scripts; maintained migrations live under drizzle/.
+/fix-quotes*.js
+/migrate.js
+/test-entity.js
+
+# Local user uploads are not part of the release.
+/public/uploads/

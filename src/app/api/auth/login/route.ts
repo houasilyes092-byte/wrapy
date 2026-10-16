@@ -54,7 +54,15 @@ export async function POST(req: NextRequest) {
         role: user.role,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("[AUTH_LOGIN_FAILED]", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown login error",
+      code:
+        error && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : undefined,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

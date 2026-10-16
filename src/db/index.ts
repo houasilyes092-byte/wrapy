@@ -8,20 +8,22 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
-// Keep TLS options in one place. node-postgres lets SSL parameters embedded in
-// the connection string override the explicit "ssl" object, which can silently
-// discard the CA certificate supplied above.
-const normalizedConnectionString = (() => {
+const connectionStringHasSslOptions = (() => {
   try {
     const url = new URL(databaseUrl);
-    for (const key of ["sslmode", "sslcert", "sslkey", "sslrootcert", "sslpassword"]) {
-      url.searchParams.delete(key);
-    }
-    return url.toString();
+    return ["sslmode", "sslcert", "sslkey", "sslrootcert"].some((key) =>
+      url.searchParams.has(key)
+    );
   } catch {
     throw new Error("DATABASE_URL is not a valid PostgreSQL connection URL");
   }
 })();
+
+if (connectionStringHasSslOptions) {
+  throw new Error(
+    "Remove SSL query parameters from DATABASE_URL and configure verified TLS with DATABASE_SSL_CA."
+  );
+}
 
 const globalForDb = globalThis as typeof globalThis & {
   __wrapyPostgresPool?: Pool;
@@ -30,7 +32,7 @@ const globalForDb = globalThis as typeof globalThis & {
 export const pool =
   globalForDb.__wrapyPostgresPool ??
   new Pool({
-    connectionString: normalizedConnectionString,
+    connectionString: databaseUrl,
     ssl: {
       rejectUnauthorized: true,
       ...(databaseSslCa ? { ca: databaseSslCa } : {}),

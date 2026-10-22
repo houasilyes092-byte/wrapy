@@ -94,10 +94,7 @@ export async function POST(req: Request) {
     console.error("Create phone model error:", error);
 
     return NextResponse.json(
-  {
-    error: "Failed to create phone model",
-    details: message,
-  },
+  { error: "Failed to create phone model" },
   { status: 500 }
 );
   }

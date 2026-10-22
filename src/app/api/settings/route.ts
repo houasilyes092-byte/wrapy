@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const publicKeys = ["primary_color", "background_color", "text_color", "logo_image", "hero_media", "hero_media_type", "hero_title", "hero_subtitle", "hero_button_text", "hero_button_link", "hero_poster", "announcement_text", "featured_title", "instagram_url", "facebook_url", "phone_number", "email_address", "tiktok_url", "tutorial_video_url", "faq_items"];
+    const publicKeys = ["primary_color", "background_color", "text_color", "logo_image", "hero_media", "hero_media_type", "hero_title", "hero_subtitle", "hero_button_text", "hero_button_link", "hero_poster", "announcement_text", "featured_title", "instagram_url", "facebook_url", "phone_number", "email_address", "tiktok_url", "tutorial_video_url", "faq_items", "shipping_price", "points_per_dinar"];
     const rows = await db.select().from(settings);
 
     const result: Record<string, string> = {};

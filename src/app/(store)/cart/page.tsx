@@ -3,12 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/cart";
-import { formatPrice, calculateShipping, DEFAULT_SHIPPING_PRICE } from "@/lib/utils";
+import { formatPrice, calculateShipping, parseShippingPrice } from "@/lib/utils";
+import { useSettings } from "@/context/settings";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, totalItems } = useCart();
-  const shipping = calculateShipping(subtotal, DEFAULT_SHIPPING_PRICE);
+  const { settings } = useSettings();
+  const shipping = calculateShipping(subtotal, parseShippingPrice(settings.shipping_price));
   const total = subtotal + shipping;
 
   if (items.length === 0) {

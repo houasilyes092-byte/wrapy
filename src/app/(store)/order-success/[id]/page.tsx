@@ -5,7 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
-import { requireAuth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { isValidOrderAccessToken, orderAccessCookieName } from "@/lib/order-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +15,11 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function OrderSuccessPage({ params }: PageProps) {
   const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
 
   const [order] = await db
     .select()
@@ -24,15 +29,21 @@ export default async function OrderSuccessPage({ params }: PageProps) {
 
   if (!order) notFound();
 
-  const session = await requireAuth();
+  const session = await getSession();
+  const isOwner = !!session && (order.userId === session.id || session.role === "admin");
 
-  // If user is not logged in, redirect to login with return URL
-  if (!session) {
-    redirect(`/login?redirect=/order-success/${id}`);
-  }
+  // Guests (and customers on another device) prove ownership with the
+  // confirmation cookie issued when the order was placed.
+  const cookieStore = await cookies();
+  const hasGuestAccess = isValidOrderAccessToken(
+    cookieStore.get(orderAccessCookieName(id))?.value,
+    order.accessTokenHash,
+    order.createdAt
+  );
 
-  // Check if user owns the order or is admin
-  if (order.userId !== session.id && session.role !== "admin") {
+  if (!isOwner && !hasGuestAccess) {
+    // Account orders: let the customer sign in. Anything else stays hidden.
+    if (!session && order.userId) redirect(`/login?redirect=/order-success/${id}`);
     notFound();
   }
 
@@ -103,6 +114,12 @@ export default async function OrderSuccessPage({ params }: PageProps) {
               <div className="flex justify-between text-brand">
                 <span>Discount</span>
                 <span>-{formatPrice(order.discount)}</span>
+              </div>
+            )}
+            {order.loyaltyDiscount > 0 && (
+              <div className="flex justify-between text-brand">
+                <span>Free skin (loyalty)</span>
+                <span>-{formatPrice(order.loyaltyDiscount)}</span>
               </div>
             )}
             <div className="border-t border-dark-border pt-2 flex justify-between text-white font-bold">

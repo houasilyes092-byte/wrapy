@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { orders, orderItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
+import { ORDER_STATUSES } from "@/lib/constants";
+import { OrderError, changeOrderStatus, type OrderStatus } from "@/lib/loyalty";
 
 export async function GET(
   _req: NextRequest,
@@ -43,26 +45,36 @@ export async function PUT(
   }
 
   const { id } = await params;
-  const body = await req.json();
+  let body: { status?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
   if (!body.status) {
     return NextResponse.json({ error: "Status is required" }, { status: 400 });
   }
 
-  const validStatuses = ["pending", "confirmed", "preparing", "shipped", "delivered", "cancelled"];
-  if (!validStatuses.includes(body.status)) {
+  if (typeof body.status !== "string" || !(ORDER_STATUSES as readonly string[]).includes(body.status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const [order] = await db
-    .update(orders)
-    .set({ status: body.status, updatedAt: new Date() })
-    .where(eq(orders.id, id))
-    .returning();
-
-  if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  try {
+    // Status, earned points and any reward refund change together or not at all.
+    const order = await changeOrderStatus(id, body.status as OrderStatus);
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    return NextResponse.json(order);
+  } catch (error) {
+    if (error instanceof OrderError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("[ORDER_STATUS_FAILED]", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json(order);
 }

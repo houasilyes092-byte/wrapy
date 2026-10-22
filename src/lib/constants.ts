@@ -43,4 +43,5 @@ export const ORDER_STATUSES = [
 
 export const DEFAULT_SHIPPING_PRICE = 8000; // 8 DT in millimes
 
-export const POINTS_PER_DINAR = 10; // loyalty points per dinar spent
+export const POINTS_PER_DINAR = 1; // loyalty points per dinar spent
+export const REWARD_POINTS_COST = 300; // points for one free skin

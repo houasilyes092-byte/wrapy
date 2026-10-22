@@ -20,6 +20,7 @@ interface OrderDetail {
     subtotal: number;
     shippingPrice: number;
     discount: number;
+    loyaltyDiscount: number;
     total: number;
     status: string;
     couponCode: string | null;
@@ -43,6 +44,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [data, setData] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [statusError, setStatusError] = useState("");
 
   useEffect(() => {
     fetch(`/api/admin/orders/${id}`)
@@ -53,6 +55,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   async function updateStatus(status: string) {
     setUpdating(true);
+    setStatusError("");
     const res = await fetch(`/api/admin/orders/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -60,6 +63,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     });
     if (res.ok && data) {
       setData({ ...data, order: { ...data.order, status } });
+    } else if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setStatusError(body?.error || "Could not update status");
     }
     setUpdating(false);
   }
@@ -169,6 +175,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </button>
               ))}
             </div>
+            {statusError && <p className="mt-3 text-xs text-red-400">{statusError}</p>}
           </div>
 
           <div className="bg-dark-card rounded-2xl p-6 border border-dark-border">
@@ -186,6 +193,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex justify-between text-brand">
                   <span>Discount {order.couponCode && `(${order.couponCode})`}</span>
                   <span>-{formatPrice(order.discount)}</span>
+                </div>
+              )}
+              {order.loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-brand">
+                  <span>Free skin (loyalty)</span>
+                  <span>-{formatPrice(order.loyaltyDiscount)}</span>
                 </div>
               )}
               <div className="border-t border-dark-border pt-2 flex justify-between text-white font-bold text-base">

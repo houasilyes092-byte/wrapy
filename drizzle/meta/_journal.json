@@ -57,6 +57,13 @@
     "when": 1791846400000,
     "tag": "0007_loyalty_schema",
     "breakpoints": true
+  },
+  {
+    "idx": 8,
+    "version": "7",
+    "when": 1792627200000,
+    "tag": "0008_order_integrity_loyalty",
+    "breakpoints": true
   }
   ]
 }

@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/cart";
-import { formatPrice, calculateShipping, DEFAULT_SHIPPING_PRICE } from "@/lib/utils";
+import { formatPrice, calculateShipping, parseShippingPrice } from "@/lib/utils";
+import { useSettings } from "@/context/settings";
+import { REWARD_POINTS_COST } from "@/lib/constants";
 import {
   ShoppingBag,
   Loader2,
@@ -11,6 +13,7 @@ import {
   X,
   ArrowLeft,
   Smartphone,
+  Gift,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -61,11 +64,28 @@ export default function CheckoutPage() {
     setIdempotencyKey(key);
   }, []);
 
-  const shipping = calculateShipping(subtotal, DEFAULT_SHIPPING_PRICE);
+  const { settings } = useSettings();
+  const shipping = calculateShipping(subtotal, parseShippingPrice(settings.shipping_price));
 
-  const discount = couponApplied?.discount || 0;
+  // Loyalty reward: signed-in customers with enough points can make one unit
+  // of a cart line free. The server re-checks the balance and the price.
+  const [loyaltyPoints, setLoyaltyPoints] = useState<number | null>(null);
+  const [rewardKey, setRewardKey] = useState("");
 
-  const total = Math.max(0, subtotal + shipping - discount);
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setLoyaltyPoints(typeof data?.user?.loyaltyPoints === "number" ? data.user.loyaltyPoints : null))
+      .catch(() => setLoyaltyPoints(null));
+  }, []);
+
+  const rewardItem = items.find((item) => `${item.productId}::${item.phoneModel}` === rewardKey);
+  const loyaltyDiscount = rewardItem ? rewardItem.price : 0;
+  const canRedeem = loyaltyPoints !== null && loyaltyPoints >= REWARD_POINTS_COST;
+
+  const discount = Math.min(couponApplied?.discount || 0, subtotal - loyaltyDiscount);
+
+  const total = Math.max(0, subtotal + shipping - discount - loyaltyDiscount);
 
   function validateField(name: string, value: string): string {
     switch (name) {
@@ -129,7 +149,7 @@ export default function CheckoutPage() {
     return isValid;
   }
 
-  async function validateCoupon() {
+  async function validateCoupon(eligibleSubtotal = subtotal - loyaltyDiscount) {
     if (!couponCode.trim()) {
       return;
     }
@@ -145,7 +165,7 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({
           code: couponCode.trim(),
-          subtotal,
+          subtotal: eligibleSubtotal,
         }),
       });
 
@@ -201,6 +221,9 @@ export default function CheckoutPage() {
           ...form,
           couponCode: couponApplied?.code || "",
           idempotencyKey,
+          reward: rewardItem
+            ? { productId: rewardItem.productId, phoneModel: rewardItem.phoneModel }
+            : null,
           items: items.map((item) => ({
             productId: item.productId,
             phoneModel: item.phoneModel,
@@ -590,7 +613,7 @@ export default function CheckoutPage() {
 
                   <button
                     type="button"
-                    onClick={validateCoupon}
+                    onClick={() => validateCoupon()}
                     disabled={couponLoading || !couponCode.trim()}
                     className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-lg transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
                   >
@@ -605,6 +628,40 @@ export default function CheckoutPage() {
                 </p>
               )}
             </div>
+
+            {/* =========================
+                LOYALTY REWARD
+            ========================== */}
+            {canRedeem && (
+              <div className="border-t border-dark-border pt-4 mb-4">
+                <label className="flex items-center gap-2 text-sm text-white mb-2" htmlFor="reward-line">
+                  <Gift className="w-4 h-4 text-brand" />
+                  Free skin — {REWARD_POINTS_COST} pts
+                  <span className="ml-auto text-xs text-dark-muted">{loyaltyPoints} pts available</span>
+                </label>
+                <select
+                  id="reward-line"
+                  value={rewardKey}
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    setRewardKey(key);
+                    // Re-price an applied coupon against the new eligible subtotal.
+                    if (couponApplied) {
+                      const line = items.find((item) => `${item.productId}::${item.phoneModel}` === key);
+                      validateCoupon(subtotal - (line ? line.price : 0));
+                    }
+                  }}
+                  className="w-full bg-dark border border-dark-border rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 min-h-[48px]"
+                >
+                  <option value="">Don&apos;t use my points</option>
+                  {items.map((item) => (
+                    <option key={`${item.productId}::${item.phoneModel}`} value={`${item.productId}::${item.phoneModel}`}>
+                      {item.productName}{item.phoneModel ? ` (${item.phoneModel})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* =========================
                 TOTALS
@@ -635,6 +692,14 @@ export default function CheckoutPage() {
                   <span>Discount</span>
 
                   <span>-{formatPrice(discount)}</span>
+                </div>
+              )}
+
+              {loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-brand">
+                  <span>Free skin (loyalty)</span>
+
+                  <span>-{formatPrice(loyaltyDiscount)}</span>
                 </div>
               )}
 

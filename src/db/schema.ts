@@ -30,8 +30,10 @@ export const loyaltyTransactionTypeEnum = pgEnum("loyalty_transaction_type", [
   "earned",
   "redeemed",
   "reward_redeemed",
+  "reversed",
+  "refunded",
 ]);
-export const rewardStatusEnum = pgEnum("reward_status", ["available", "redeemed", "expired"]);
+export const rewardStatusEnum = pgEnum("reward_status", ["available", "redeemed", "expired", "cancelled"]);
 
 // Users
 export const users = pgTable("users", {
@@ -103,6 +105,11 @@ export const orders = pgTable("orders", {
   couponCode: varchar("coupon_code", { length: 100 }),
   loyaltyPointsUsed: integer("loyalty_points_used").default(0).notNull(),
   idempotencyKey: varchar("idempotency_key", { length: 100 }).unique(),
+  // Points currently credited for this order. NULL = legacy order created
+  // before lifecycle-based loyalty; such orders are never adjusted.
+  loyaltyPointsAwarded: integer("loyalty_points_awarded").default(0),
+  // SHA-256 of the guest confirmation token (the raw token is never stored).
+  accessTokenHash: varchar("access_token_hash", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -191,6 +198,6 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
   phoneModel: varchar("phone_model", { length: 255 }).notNull(),
   pointsUsed: integer("points_used").default(300).notNull(),
   status: rewardStatusEnum("status").default("redeemed").notNull(),
-  orderId: uuid("order_id").references(() => orders.id),
+  orderId: uuid("order_id").references(() => orders.id).unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

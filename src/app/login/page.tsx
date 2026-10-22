@@ -1,8 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+// Reasons sent back by /auth/google/start and /auth/google/callback.
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_not_configured: "La connexion avec Google n'est pas encore activée sur ce site.",
+  google_state: "La connexion avec Google a expiré. Veuillez réessayer.",
+  google_denied: "La connexion avec Google a été annulée.",
+  google_email: "Votre compte Google doit avoir une adresse e-mail vérifiée.",
+  google_auth: "La connexion avec Google a échoué. Veuillez réessayer.",
+};
+
+// Only same-site paths, never "//host" or absolute URLs (no open redirect).
+function safeRedirect(value: string | null): string | null {
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : null;
+}
+
+// The query string is read only in the browser (empty on the server), so the
+// prerendered page and the first client render match.
+const noSubscription = () => () => {};
+function useQueryParam(name: string): string | null {
+  return useSyncExternalStore(
+    noSubscription,
+    () => new URLSearchParams(window.location.search).get(name),
+    () => null
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +40,9 @@ export default function LoginPage() {
     phone: "",
     password: "",
   });
+  const googleReason = useQueryParam("error");
+  const redirectParam = useQueryParam("redirect");
+  const shownError = error || (googleReason ? GOOGLE_ERRORS[googleReason] ?? "" : "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,8 +69,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect based on role
-      if (data.user?.role === "admin") {
+      // Return to the page that sent the customer here, else by role
+      const next = safeRedirect(redirectParam);
+      if (next) {
+        router.push(next);
+      } else if (data.user?.role === "admin") {
         router.push("/admin");
       } else {
         router.push("/account");
@@ -143,9 +174,9 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && (
+            {shownError && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-xs text-red-400">
-                {error}
+                {shownError}
               </div>
             )}
 

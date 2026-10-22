@@ -1,8 +1,38 @@
+import { X509Certificate } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseSslCa = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n").trim();
+
+/**
+ * Rebuilds PEM from however the certificate was pasted into the host's env UI
+ * (real newlines, literal "\n", or everything on one line separated by spaces).
+ * Node silently ignores malformed PEM, which would surface later as the
+ * misleading SELF_SIGNED_CERT_IN_CHAIN, so an unreadable value fails loudly.
+ */
+function normalizeCaPem(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  const text = raw.replace(/\\n/g, "\n");
+  const blocks = [...text.matchAll(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g)];
+  if (blocks.length === 0) {
+    throw new Error("DATABASE_SSL_CA must contain a PEM certificate (-----BEGIN CERTIFICATE----- ...).");
+  }
+  const pem = blocks
+    .map((block) => {
+      const body = block[1].replace(/\s+/g, "");
+      const lines = body.match(/.{1,64}/g) ?? [];
+      return ["-----BEGIN CERTIFICATE-----", ...lines, "-----END CERTIFICATE-----"].join("\n");
+    })
+    .join("\n");
+  try {
+    for (const cert of pem.split(/(?<=-----END CERTIFICATE-----)\n/)) new X509Certificate(cert);
+  } catch {
+    throw new Error("DATABASE_SSL_CA is not a valid certificate. Paste the Supabase CA file contents again.");
+  }
+  return pem;
+}
+
+const databaseSslCa = normalizeCaPem(process.env.DATABASE_SSL_CA);
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
@@ -18,6 +48,18 @@ const connectionStringHasSslOptions = (() => {
     throw new Error("DATABASE_URL is not a valid PostgreSQL connection URL");
   }
 })();
+
+if (!databaseSslCa && process.env.NODE_ENV === "production") {
+  // Supabase's pooler certificate chains to Supabase's own root CA; without it
+  // every query fails with SELF_SIGNED_CERT_IN_CHAIN.
+  console.error("[DATABASE_SSL_CA_MISSING] Set DATABASE_SSL_CA to the Supabase CA certificate (PEM).");
+}
+
+if (/^db\.[a-z0-9]+\.supabase\.co$/i.test(new URL(databaseUrl).hostname)) {
+  // Supabase direct hosts are IPv6-only; serverless runtimes such as Netlify
+  // Functions resolve IPv4 only and fail with ENOTFOUND.
+  console.error("[DATABASE_URL_DIRECT_HOST] Use the Supabase pooler connection string (…pooler.supabase.com) on serverless hosts.");
+}
 
 if (connectionStringHasSslOptions) {
   throw new Error(

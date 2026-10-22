@@ -104,7 +104,12 @@ export default function AdminReviews() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this review?")) return;
-    await fetch(`/api/admin/reviews?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/reviews?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      alert(body?.error || "Could not delete. Please try again.");
+      return;
+    }
     setReviews((prev) => prev.filter((r) => r.id !== id));
   }
 

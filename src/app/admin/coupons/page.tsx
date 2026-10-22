@@ -105,7 +105,12 @@ export default function AdminCoupons() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this coupon?")) return;
-    await fetch(`/api/admin/coupons?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/coupons?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      alert(body?.error || "Could not delete. Please try again.");
+      return;
+    }
     setCoupons((prev) => prev.filter((c) => c.id !== id));
   }
 

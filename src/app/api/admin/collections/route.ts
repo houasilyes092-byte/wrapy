@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { collections } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { collections, products } from "@/db/schema";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { collectionSchema } from "@/lib/validations";
 
@@ -126,7 +126,38 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });
   }
 
-  await db.delete(collections).where(eq(collections.id, id));
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [{ count }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(products)
+        .where(and(eq(products.collectionId, id), eq(products.isDeleted, false)));
+      if (count > 0) return { blocked: count };
 
-  return NextResponse.json({ success: true });
+      // Soft-deleted products keep their rows; unlink them so the FK allows the delete.
+      await tx
+        .update(products)
+        .set({ collectionId: null })
+        .where(and(eq(products.collectionId, id), eq(products.isDeleted, true)));
+      const deleted = await tx.delete(collections).where(eq(collections.id, id)).returning({ id: collections.id });
+      return { deleted: deleted.length };
+    });
+
+    if ("blocked" in result) {
+      return NextResponse.json(
+        { error: `This collection still has ${result.blocked} product(s). Move or delete them first.` },
+        { status: 409 }
+      );
+    }
+    if (!result.deleted) {
+      return NextResponse.json({ error: "Collection not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[COLLECTION_DELETE_FAILED]", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

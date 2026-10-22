@@ -108,7 +108,13 @@ export default function AdminCollections() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this collection?")) return;
-    await fetch(`/api/admin/collections?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/collections?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      // Keep the row: removing it locally would make it "reappear" on refresh.
+      const body = await res.json().catch(() => null);
+      alert(body?.error || "Could not delete this collection.");
+      return;
+    }
     setCollections((prev) => prev.filter((c) => c.id !== id));
   }
 

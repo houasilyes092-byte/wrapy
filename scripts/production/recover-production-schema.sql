@@ -385,9 +385,9 @@ BEGIN
       ('loyalty_transaction_type', 'reversed'), ('loyalty_transaction_type', 'refunded'),
       ('reward_status', 'redeemed'), ('reward_status', 'cancelled')
     ) AS v(typ, label)
-    WHERE EXISTS (SELECT 1 FROM pg_type t WHERE t.typname = v.typ)
+    WHERE EXISTS (SELECT 1 FROM pg_type t WHERE t.typname = v.typ AND t.typnamespace = 'public'::regnamespace)
       AND NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
-                      WHERE t.typname = v.typ AND e.enumlabel = v.label)
+                      WHERE t.typname = v.typ AND t.typnamespace = 'public'::regnamespace AND e.enumlabel = v.label)
   ), '{}');
 
   IF cardinality(problems) > 0 THEN

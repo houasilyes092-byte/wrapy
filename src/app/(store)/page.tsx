@@ -7,7 +7,7 @@ import HomeProductCarousel from "@/components/HomeProductCarousel";
 import { Shield, Smartphone, Sparkles, Zap, Palette, ChevronDown, ChevronUp } from "lucide-react";
 import { FAQSection, TutorialSection, type FaqItem } from "@/components/StoreExtras";
 import { getPublishedFaq } from "@/lib/faq";
-import ReviewsMarquee from "@/components/ReviewsMarquee";
+import HomeReviews, { type HomeReview } from "@/components/HomeReviews";
 import { CategoriesGrid, type CategoryCard } from "@/components/CategoriesGrid";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,9 @@ export default async function HomePage() {
     .where(and(eq(products.isActive, true), eq(products.isDeleted, false)))
     .orderBy(products.name);
 
-  const approvedReviews = await db
+  // Approved reviews only. "Show on homepage" pins a review to the front;
+  // without it the newest approved reviews are shown.
+  const approvedReviews: HomeReview[] = await db
     .select({
       id: reviews.id,
       rating: reviews.rating,
@@ -67,18 +69,23 @@ export default async function HomePage() {
       title: reviews.title,
       customerName: reviews.customerName,
       productName: products.name,
-      phoneModel: sql<string | null>`NULL::text`.as("phoneModel"),
+      productSlug: products.slug,
       createdAt: reviews.createdAt,
+      verifiedPurchase: sql<boolean>`exists (select 1 from orders o join order_items oi on oi.order_id = o.id where o.user_id = ${reviews.userId} and oi.product_id = ${reviews.productId} and o.status = 'delivered')`,
     })
     .from(reviews)
-    .leftJoin(products, eq(reviews.productId, products.id))
+    .innerJoin(products, eq(reviews.productId, products.id))
     .where(and(
       eq(reviews.isApproved, true),
-      eq(reviews.isHomepage, true),
       eq(products.isDeleted, false),
     ))
-    .orderBy(desc(reviews.createdAt))
-    .limit(30);
+    .orderBy(desc(reviews.isHomepage), desc(reviews.createdAt))
+    .limit(12);
+  const [reviewStats] = await db
+    .select({ count: sql<number>`count(*)`, average: sql<number>`coalesce(avg(${reviews.rating}), 0)` })
+    .from(reviews)
+    .innerJoin(products, eq(reviews.productId, products.id))
+    .where(and(eq(reviews.isApproved, true), eq(products.isDeleted, false)));
 
   const settingRows = await db.select().from(settings);
 
@@ -186,11 +193,11 @@ export default async function HomePage() {
       </section>
 
       {/* FEATURED PRODUCTS */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex items-end justify-between mb-12">
+      <section className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="flex items-end justify-between mb-6 sm:mb-12">
           <div>
             <p className="text-xs text-brand font-medium tracking-wider uppercase mb-2">Curated Selection</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Featured Skins</h2>
+            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">Featured Skins</h2>
           </div>
           <Link href="/skins" className="text-sm text-gray-400 hover:text-brand transition-colors hidden sm:block">
             View All →
@@ -200,22 +207,32 @@ export default async function HomePage() {
           ...p,
           collectionName: p.collectionId ? collectionMap[p.collectionId] : undefined,
         }))} />
-        <div className="mt-8 text-center sm:hidden">
-          <Link href="/skins" className="text-sm text-brand font-medium">
+        <div className="mt-4 text-center sm:hidden">
+          <Link href="/skins" className="inline-flex min-h-11 items-center text-sm text-brand font-medium">
             View All Products →
           </Link>
         </div>
       </section>
 
-      <ReviewsMarquee reviews={approvedReviews as any} products={activeProducts} />
+      <HomeReviews
+        reviews={approvedReviews.map((r) => ({ ...r, verifiedPurchase: Boolean(r.verifiedPurchase), productName: r.productName ?? null, productSlug: r.productSlug ?? null }))}
+        total={Number(reviewStats?.count || 0)}
+        average={Number(reviewStats?.average || 0)}
+        products={activeProducts}
+      />
 
       {/* COLLECTIONS: featured only, in the admin's order; hidden when none */}
       {featuredCollections.length > 0 && (
-      <section id="collections" className="py-12 bg-dark-card">
+      <section id="collections" className="py-10 sm:py-12 bg-dark-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-6">
-            <p className="text-xs text-brand font-medium tracking-wider uppercase mb-1.5">Collections</p>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Catégories</h2>
+          <div className="mb-4 sm:mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[11px] text-brand font-medium tracking-[0.2em] uppercase mb-1">Collections</p>
+              <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight">Categories</h2>
+            </div>
+            <Link href="/skins" className="inline-flex min-h-11 shrink-0 items-center text-xs font-medium text-gray-400 transition-colors hover:text-brand">
+              View all →
+            </Link>
           </div>
           <CategoriesGrid collections={featuredCollections} />
         </div>
@@ -223,12 +240,12 @@ export default async function HomePage() {
       )}
 
       {/* WHY WRAPY */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
+      <section className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="text-center mb-8 sm:mb-14">
           <p className="text-xs text-brand font-medium tracking-wider uppercase mb-2">Why Choose Us</p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">The Wrapy Difference</h2>
+          <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">The Wrapy Difference</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:gap-8 lg:grid-cols-5">
           {[
             { icon: Sparkles, title: "Premium Materials", desc: "3M™ quality vinyl that lasts" },
             { icon: Smartphone, title: "Precise Fit", desc: "Laser-cut for every device" },
@@ -236,8 +253,8 @@ export default async function HomePage() {
             { icon: Shield, title: "Full Protection", desc: "Scratch & fingerprint resistant" },
             { icon: Palette, title: "Unique Designs", desc: "Exclusive artistic patterns" },
           ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="text-center group">
-              <div className="w-14 h-14 rounded-2xl bg-brand/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-brand/20 transition-colors">
+            <div key={title} className="text-center group last:col-span-2 lg:last:col-span-1">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand/10 flex items-center justify-center mx-auto mb-3 sm:mb-4 group-hover:bg-brand/20 transition-colors">
                 <Icon className="w-6 h-6 text-brand" />
               </div>
               <h3 className="text-sm font-semibold text-white mb-1">{title}</h3>

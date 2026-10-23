@@ -19,12 +19,12 @@ export default function Footer() {
 
   return (
     <footer className="bg-dark border-t border-dark-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
 
           {/* BRAND */}
-          <div>
+          <div className="col-span-2 lg:col-span-1">
             <Link href="/" className="inline-flex items-center mb-3">
               {logo ? (
                 <Image
@@ -47,7 +47,7 @@ export default function Footer() {
 
             {/* SOCIAL LINKS */}
             {(instagram || facebook || tiktok) && (
-              <div className="flex items-center gap-4 mt-6">
+              <div className="flex items-center gap-2 mt-5 -ml-2.5">
 
                 {instagram && (
                   <a
@@ -55,7 +55,7 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Instagram"
-                    className="text-dark-muted hover:text-brand transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center text-dark-muted hover:text-brand transition-colors"
                   >
                     <Camera className="w-5 h-5" />
                   </a>
@@ -67,7 +67,7 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Facebook"
-                    className="text-dark-muted hover:text-brand transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center text-dark-muted hover:text-brand transition-colors"
                   >
                     <span className="text-lg font-bold">f</span>
                   </a>
@@ -79,7 +79,7 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="TikTok"
-                    className="text-dark-muted hover:text-brand transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center text-dark-muted hover:text-brand transition-colors"
                   >
                     <span className="text-lg font-bold">♪</span>
                   </a>
@@ -91,20 +91,20 @@ export default function Footer() {
 
           {/* SHOP */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-2">
               Shop
             </h4>
 
-            <ul className="space-y-3">
+            <ul className="space-y-1">
               {hasFaq && (
                 <li>
-                  <Link href="/faq" className="text-sm text-dark-muted hover:text-white transition-colors">Questions fréquentes</Link>
+                  <Link href="/faq" className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors">FAQ</Link>
                 </li>
               )}
               <li>
                 <Link
                   href="/skins"
-                  className="text-sm text-dark-muted hover:text-white transition-colors"
+                  className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors"
                 >
                   All Skins
                 </Link>
@@ -113,7 +113,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/skins?bestseller=true"
-                  className="text-sm text-dark-muted hover:text-white transition-colors"
+                  className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors"
                 >
                   Best Sellers
                 </Link>
@@ -122,7 +122,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/skins?featured=true"
-                  className="text-sm text-dark-muted hover:text-white transition-colors"
+                  className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors"
                 >
                   Featured
                 </Link>
@@ -132,15 +132,15 @@ export default function Footer() {
 
           {/* SUPPORT */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-2">
               Support
             </h4>
 
-            <ul className="space-y-3">
+            <ul className="space-y-1">
               <li>
                 <Link
                   href="/account/orders"
-                  className="text-sm text-dark-muted hover:text-white transition-colors"
+                  className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors"
                 >
                   Track Order
                 </Link>
@@ -149,7 +149,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/account"
-                  className="text-sm text-dark-muted hover:text-white transition-colors"
+                  className="inline-flex min-h-9 items-center text-sm text-dark-muted hover:text-white transition-colors"
                 >
                   My Account
                 </Link>
@@ -157,19 +157,20 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* CONTACT */}
-          <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+          {/* CONTACT (only when the store has contact details) */}
+          {(phone || email) && (
+          <div className="col-span-2 sm:col-span-1">
+            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-2">
               Contact
             </h4>
 
-            <ul className="space-y-3">
+            <ul className="space-y-1">
 
               {phone && (
                 <li>
                   <a
                     href={`tel:${phone}`}
-                    className="flex items-center gap-2 text-sm text-dark-muted hover:text-white transition-colors"
+                    className="flex min-h-9 items-center gap-2 break-all text-sm text-dark-muted hover:text-white transition-colors"
                   >
                     <Phone className="w-4 h-4" />
                     {phone}
@@ -181,7 +182,7 @@ export default function Footer() {
                 <li>
                   <a
                     href={`mailto:${email}`}
-                    className="flex items-center gap-2 text-sm text-dark-muted hover:text-white transition-colors"
+                    className="flex min-h-9 items-center gap-2 break-all text-sm text-dark-muted hover:text-white transition-colors"
                   >
                     <Mail className="w-4 h-4" />
                     {email}
@@ -191,10 +192,11 @@ export default function Footer() {
 
             </ul>
           </div>
+          )}
 
         </div>
 
-        <div className="border-t border-dark-border mt-12 pt-8 text-center">
+        <div className="border-t border-dark-border mt-10 pt-6 text-center sm:mt-12 sm:pt-8">
           <p className="text-xs text-dark-muted">
             © {new Date().getFullYear()} Wrapy. All rights reserved. Premium phone skins.
           </p>

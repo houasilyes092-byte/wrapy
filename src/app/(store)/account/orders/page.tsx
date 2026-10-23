@@ -26,7 +26,7 @@ export default async function MyOrdersPage() {
       {userOrders.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-dark-muted mb-4">No orders yet</p>
-          <Link href="/skins" className="text-sm text-brand">Start Shopping →</Link>
+          <Link href="/skins" className="inline-flex min-h-11 items-center text-sm text-brand">Start Shopping →</Link>
         </div>
       ) : (
         <div className="space-y-4">

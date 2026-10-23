@@ -108,7 +108,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             {product.collectionName}
           </p>
         )}
-        <Link href={`/skins/${product.slug}`}>
+        <Link href={`/skins/${product.slug}`} className="-my-1.5 block py-1.5">
           <h3 className="text-sm font-semibold text-white hover:text-brand transition-colors truncate">
             {product.name}
           </h3>

@@ -41,18 +41,18 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 sm:h-20">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex min-w-0 shrink items-center gap-2 py-2">
             {logo ? (
               <Image
                 src={logo}
                 alt="Wrapy"
                 width={180}
                 height={48}
-                className="max-w-[150px] sm:max-w-[180px] max-h-12 object-contain"
+                className="h-auto max-h-10 w-auto max-w-[104px] object-contain min-[375px]:max-w-[128px] sm:max-h-12 sm:max-w-[180px]"
               />
             ) : (
               <>
-                <span className="text-2xl sm:text-3xl font-black tracking-tighter text-white">
+                <span className="text-xl min-[375px]:text-2xl sm:text-3xl font-black tracking-tighter text-white">
                   WRAPY
                 </span>
                 <span className="hidden sm:inline-block w-2 h-2 rounded-full bg-brand" />
@@ -85,10 +85,10 @@ export default function Header() {
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-0 sm:gap-2">
             <Link
               href="/account/wishlist"
-              className="text-gray-400 hover:text-white transition-colors p-2"
+              className="text-gray-400 hover:text-white transition-colors p-2.5"
               aria-label="Wishlist"
             >
               <Heart className="w-5 h-5" />
@@ -96,7 +96,7 @@ export default function Header() {
 
             <Link
               href="/account"
-              className="text-gray-400 hover:text-white transition-colors p-2"
+              className="text-gray-400 hover:text-white transition-colors p-2.5"
               aria-label="My Account"
             >
               <User className="w-5 h-5" />
@@ -104,7 +104,7 @@ export default function Header() {
 
             <Link
               href="/cart"
-              className="relative text-gray-400 hover:text-white transition-colors p-2"
+              className="relative text-gray-400 hover:text-white transition-colors p-2.5"
               aria-label={`Cart (${totalItems} items)`}
             >
               <ShoppingBag className="w-5 h-5" />
@@ -117,7 +117,7 @@ export default function Header() {
             </Link>
 
             <button
-              className="md:hidden text-gray-400 hover:text-white p-2"
+              className="md:hidden text-gray-400 hover:text-white p-2.5"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-expanded={menuOpen}
               aria-controls="mobile-menu"

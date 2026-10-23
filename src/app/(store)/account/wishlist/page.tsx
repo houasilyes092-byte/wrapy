@@ -28,7 +28,7 @@ export default function WishlistPage() {
         <div className="text-center py-20">
           <Heart className="w-16 h-16 text-dark-border mx-auto mb-4" />
           <p className="text-dark-muted mb-4">Your wishlist is empty</p>
-          <Link href="/skins" className="text-sm text-brand">
+          <Link href="/skins" className="inline-flex min-h-11 items-center text-sm text-brand">
             Browse Skins →
           </Link>
         </div>

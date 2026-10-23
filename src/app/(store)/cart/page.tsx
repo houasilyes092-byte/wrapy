@@ -62,7 +62,7 @@ export default function CartPage() {
                 </div>
               </Link>
               <div className="flex-1 min-w-0">
-                <Link href={`/skins/${item.slug}`}>
+                <Link href={`/skins/${item.slug}`} className="-my-1.5 block py-1.5">
                   <h3 className="text-sm font-semibold text-white truncate hover:text-brand transition-colors">
                     {item.productName}
                   </h3>

@@ -43,10 +43,19 @@ export async function getApprovedReviews(productId: string): Promise<PublicRevie
   return rows.map((row) => ({ ...row, verifiedPurchase: Boolean(row.verifiedPurchase) }));
 }
 
-/** "Rabih Wassim" -> "Rabih W." so public reviews never show a full name. */
-export function publicReviewerName(fullName: string | null | undefined): string {
-  const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "Client";
-  const first = parts[0].slice(0, 40);
-  return parts.length > 1 ? `${first} ${parts[parts.length - 1][0].toUpperCase()}.` : first;
+export const REVIEW_NAME_MAX = 50;
+
+/**
+ * Public name typed by the reviewer. Trimmed, inner spaces collapsed, 1–50
+ * characters (any script, e.g. Arabic). Control and bidi-override characters
+ * are refused. The name is stored as text and always rendered escaped (React),
+ * so HTML in it is displayed literally, never executed.
+ */
+export function validateReviewerName(raw: unknown): { name: string } | { error: string } {
+  if (typeof raw !== "string") return { error: "Indiquez votre nom." };
+  const name = raw.normalize("NFC").replace(/\s+/g, " ").trim();
+  if (!name) return { error: "Indiquez votre nom." };
+  if ([...name].length > REVIEW_NAME_MAX) return { error: `Votre nom ne peut pas dépasser ${REVIEW_NAME_MAX} caractères.` };
+  if (/[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/.test(name)) return { error: "Votre nom contient des caractères non autorisés." };
+  return { name };
 }

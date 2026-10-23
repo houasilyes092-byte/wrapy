@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, reviews } from "@/db/schema";
 import { dbErrorCode, getSession } from "@/lib/auth";
-import { getApprovedReviews, isUuid, publicReviewerName } from "@/lib/reviews";
+import { getApprovedReviews, isUuid, validateReviewerName } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
   const comment = typeof body?.comment === "string" ? body.comment.trim() : "";
 
   if (!isUuid(productId)) return NextResponse.json({ error: "Produit invalide." }, { status: 400 });
+  const nameCheck = validateReviewerName(body?.customerName);
+  if ("error" in nameCheck) return NextResponse.json({ error: nameCheck.error }, { status: 400 });
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: "Choisissez une note de 1 à 5." }, { status: 400 });
   if (title.length > 100) return NextResponse.json({ error: "Le titre ne peut pas dépasser 100 caractères." }, { status: 400 });
   if (comment.length < 3 || comment.length > 2000) return NextResponse.json({ error: "Votre avis doit contenir entre 3 et 2000 caractères." }, { status: 400 });
@@ -47,7 +49,8 @@ export async function POST(request: NextRequest) {
       .values({
         productId,
         userId: session.id,
-        customerName: publicReviewerName(session.name),
+        // The reviewer chooses their public name; account name and e-mail are never shown.
+        customerName: nameCheck.name,
         title: title || null,
         rating,
         comment,

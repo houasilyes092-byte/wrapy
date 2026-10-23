@@ -14,6 +14,7 @@ interface ReviewSubmissionModalProps {
 export default function ReviewSubmissionModal({ isOpen, onClose, productId, productName }: ReviewSubmissionModalProps) {
   // Reviews need an account (one review per customer and product).
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [customerName, setCustomerName] = useState("");
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
@@ -34,6 +35,15 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const name = customerName.replace(/\s+/g, " ").trim();
+    if (!name) {
+      setErrorMessage("Please enter your name.");
+      return;
+    }
+    if ([...name].length > 50) {
+      setErrorMessage("Your name can be at most 50 characters.");
+      return;
+    }
     if (rating === 0) {
       setErrorMessage("Please select a rating.");
       return;
@@ -50,7 +60,7 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
       const response = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, rating, title, comment }),
+        body: JSON.stringify({ productId, rating, title, comment, customerName: name }),
       });
 
       const data = await response.json();
@@ -60,6 +70,7 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
       }
 
       setStatus("success");
+      setCustomerName("");
       setTitle("");
       setComment("");
       setRating(0);
@@ -126,6 +137,24 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
             </div>
 
             <div className="space-y-4">
+              <div>
+                <label htmlFor="customerName" className="block text-sm font-medium text-white mb-1.5">
+                  Your Name <span className="text-brand">*</span>
+                </label>
+                <input
+                  id="customerName"
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Name shown with your review"
+                  maxLength={50}
+                  required
+                  autoComplete="nickname"
+                  disabled={status === "submitting"}
+                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 disabled:opacity-50 transition-colors"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-white mb-1.5">
                   Rating <span className="text-brand">*</span>

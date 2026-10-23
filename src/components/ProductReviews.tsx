@@ -26,6 +26,7 @@ export default function ProductReviews({ productId, reviews: initialReviews, vie
   const [sort, setSort] = useState("newest");
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -68,6 +69,15 @@ export default function ProductReviews({ productId, reviews: initialReviews, vie
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    const name = customerName.replace(/\s+/g, " ").trim();
+    if (!name) {
+      setError("Indiquez votre nom.");
+      return;
+    }
+    if ([...name].length > 50) {
+      setError("Votre nom ne peut pas dépasser 50 caractères.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     setError("");
@@ -75,12 +85,13 @@ export default function ProductReviews({ productId, reviews: initialReviews, vie
       const response = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, rating, title, comment }),
+        body: JSON.stringify({ productId, rating, title, comment, customerName: name }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Impossible d'envoyer votre avis.");
       setTitle("");
       setComment("");
+      setCustomerName("");
       setSubmitted(true);
       setMessage("Merci ! Votre avis sera visible après validation.");
     } catch (err) {
@@ -183,6 +194,22 @@ export default function ProductReviews({ productId, reviews: initialReviews, vie
               <Star className={`h-6 w-6 ${value <= rating ? "fill-brand text-brand" : "text-gray-500"}`} />
             </button>
           ))}
+        </div>
+        <div className="mb-4">
+          <label htmlFor="review-name" className="block text-xs text-dark-muted mb-1.5">
+            Votre nom <span className="text-brand">*</span>
+          </label>
+          <input
+            id="review-name"
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            required
+            maxLength={50}
+            autoComplete="nickname"
+            placeholder="Nom affiché avec votre avis"
+            className="w-full rounded-xl border border-dark-border bg-dark px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
+          />
         </div>
         <div className="mb-4">
           <label htmlFor="review-title" className="block text-xs text-dark-muted mb-1.5">

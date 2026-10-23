@@ -6,7 +6,7 @@ import Link from "next/link";
 
 // Reasons sent back by /auth/google/start and /auth/google/callback.
 const GOOGLE_ERRORS: Record<string, string> = {
-  google_not_configured: "La connexion avec Google n'est pas encore activée sur ce site.",
+  google_not_configured: "La connexion avec Google sera bientôt disponible. Utilisez votre e-mail en attendant.",
   google_state: "La connexion avec Google a expiré. Veuillez réessayer.",
   google_denied: "La connexion avec Google a été annulée.",
   google_email: "Votre compte Google doit avoir une adresse e-mail vérifiée.",
@@ -131,13 +131,32 @@ export default function AuthForm({ mode, error: initialError, redirect, googleEn
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <a
-              href={googleHref}
-              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-dark-border text-sm font-semibold text-white transition-colors hover:border-brand/50"
-            >
-              <GoogleMark />
-              Continuer avec Google
-            </a>
+            {googleEnabled ? (
+              <a
+                href={googleHref}
+                className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-dark-border text-sm font-semibold text-white transition-colors hover:border-brand/50"
+              >
+                <GoogleMark />
+                Continuer avec Google
+              </a>
+            ) : (
+              // Google keys are not configured yet: never send visitors into
+              // an OAuth flow that cannot finish.
+              <div>
+                <button
+                  type="button"
+                  disabled
+                  aria-describedby="google-soon"
+                  className="flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-dark-border text-sm font-semibold text-white opacity-50"
+                >
+                  <GoogleMark />
+                  Continuer avec Google
+                </button>
+                <p id="google-soon" className="mt-1.5 text-center text-xs text-dark-muted">
+                  Connexion avec Google bientôt disponible.
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-3 text-xs text-dark-muted">
               <span className="h-px flex-1 bg-dark-border" />
               ou avec votre e-mail

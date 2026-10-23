@@ -14,6 +14,19 @@ export default function Footer() {
   const tiktok = settings.tiktok_url || "";
   const phone = settings.phone_number || "";
   const email = settings.email_address || "";
+  // Same rule as the homepage: link to the FAQ only when it has a question to show.
+  const hasFaq = (() => {
+    try {
+      const items: unknown = JSON.parse(settings.faq_items || "[]");
+      return Array.isArray(items) && items.some((item) =>
+        typeof item?.question === "string" && item.question.trim() &&
+        typeof item?.answer === "string" && item.answer.trim() &&
+        item.enabled !== false
+      );
+    } catch {
+      return false;
+    }
+  })();
 
   return (
     <footer className="bg-dark border-t border-dark-border">
@@ -94,9 +107,11 @@ export default function Footer() {
             </h4>
 
             <ul className="space-y-3">
-              <li>
-                <Link href="/#faq-title" className="text-sm text-dark-muted hover:text-white transition-colors">Questions fréquentes</Link>
-              </li>
+              {hasFaq && (
+                <li>
+                  <Link href="/#faq-title" className="text-sm text-dark-muted hover:text-white transition-colors">Questions fréquentes</Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/skins"

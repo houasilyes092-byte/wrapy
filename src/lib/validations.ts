@@ -50,14 +50,14 @@ export const checkoutSchema = z.object({
   items: z.array(
     z.object({
       productId: z.string().uuid(),
-      phoneModel: z.string().optional(),
+      phoneModel: z.string().trim().max(100).optional(),
       quantity: z.number().int().min(1).max(99),
     })
   ).min(1, "Cart cannot be empty").max(50),
   // Spend 300 loyalty points to make one unit of this cart line free.
   reward: z.object({
     productId: z.string().uuid(),
-    phoneModel: z.string().optional(),
+    phoneModel: z.string().trim().max(100).optional(),
   }).optional().nullable(),
 });
 

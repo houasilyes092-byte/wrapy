@@ -8,10 +8,16 @@ import { useSettings } from "@/context/settings";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, subtotal, totalItems } = useCart();
+  const { items, removeItem, updateQuantity, subtotal, totalItems, ready } = useCart();
   const { settings } = useSettings();
   const shipping = calculateShipping(subtotal, parseShippingPrice(settings.shipping_price));
   const total = subtotal + shipping;
+
+  // Until the saved cart is read, render a quiet placeholder rather than
+  // flashing "Your Cart is Empty".
+  if (!ready) {
+    return <div className="min-h-[60vh]" aria-busy="true" />;
+  }
 
   if (items.length === 0) {
     return (

@@ -64,6 +64,8 @@ interface Props {
   }[];
 }
 
+const MAX_MODEL_NAME_LENGTH = 100;
+
 export default function ProductDetail({
   product,
   collectionName,
@@ -218,6 +220,20 @@ export default function ProductDetail({
     return flat;
   }, [filteredModels]);
 
+  // Products without a compatibility list accept any model the customer types,
+  // which is also what the order API accepts. Restricted products only accept
+  // the listed models.
+  const allowCustomModel = product.compatibleModels.length === 0;
+  const typedModel = customModel.trim().replace(/\s+/g, " ").slice(0, MAX_MODEL_NAME_LENGTH);
+  const exactMatch = availableModels.find(
+    (model) => model.name.toLowerCase() === typedModel.toLowerCase()
+  );
+  const typedAlreadySelected = selectedModels.some(
+    (m) => m.modelName.toLowerCase() === typedModel.toLowerCase()
+  );
+  const canAddTypedModel =
+    allowCustomModel && typedModel.length >= 2 && !exactMatch && !typedAlreadySelected;
+
   const isModelCompatible = (model: string): boolean => {
     if (product.compatibleModels.length === 0) {
       return true; // If no restrictions, all models are compatible
@@ -230,17 +246,18 @@ export default function ProductDetail({
   };
 
   const handleModelSelect = useCallback((modelName: string) => {
-    if (isModelAlreadySelected(modelName)) {
-      return; // Already selected, ignore
-    }
-    setSelectedModels((prev) => [...prev, { modelName, quantity: 1 }]);
+    setSelectedModels((prev) =>
+      prev.some((m) => m.modelName === modelName)
+        ? prev
+        : [...prev, { modelName, quantity: 1 }]
+    );
     setCustomModel("");
     setShowSuggestions(false);
     setHighlightedIndex(-1);
     setError("");
     setHasInteracted(true);
     inputRef.current?.blur();
-  }, [selectedModels]);
+  }, []);
 
   const handleCustomModelChange = useCallback((value: string) => {
     setCustomModel(value);
@@ -266,6 +283,16 @@ export default function ProductDetail({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && highlightedIndex < 0) {
+        if (exactMatch) {
+          e.preventDefault();
+          handleModelSelect(exactMatch.name);
+        } else if (canAddTypedModel) {
+          e.preventDefault();
+          handleModelSelect(typedModel);
+        }
+        return;
+      }
       if (!showSuggestions || flattenedModels.length === 0) return;
 
       switch (e.key) {
@@ -301,7 +328,7 @@ export default function ProductDetail({
           break;
       }
     },
-    [showSuggestions, flattenedModels, highlightedIndex, handleModelSelect]
+    [showSuggestions, flattenedModels, highlightedIndex, handleModelSelect, exactMatch, canAddTypedModel, typedModel]
   );
 
   const removeModel = useCallback((modelName: string) => {
@@ -655,14 +682,26 @@ export default function ProductDetail({
                       aria-label="Phone model suggestions"
                     >
                       <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden shadow-lg max-h-[60vh]">
-                        {flattenedModels.length === 0 && customModel.trim() ? (
+                        {flattenedModels.length === 0 && !canAddTypedModel ? (
                           <div className="px-4 py-6 text-center">
-                            <p className="text-sm text-dark-muted">
-                              No models match &apos;{customModel}&apos;
-                            </p>
-                            <p className="text-xs text-dark-muted/50 mt-1">
-                              Try a different search or enter your model manually
-                            </p>
+                            {customModel.trim() ? (
+                              <>
+                                <p className="text-sm text-dark-muted">
+                                  No models match &apos;{customModel}&apos;
+                                </p>
+                                <p className="text-xs text-dark-muted/50 mt-1">
+                                  {!allowCustomModel
+                                    ? "This skin is only available for the listed models"
+                                    : typedAlreadySelected
+                                    ? "Already in your selection"
+                                    : "Type at least 2 characters to add your model"}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-dark-muted">
+                                Type your phone model, then press Enter
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <>
@@ -718,6 +757,22 @@ export default function ProductDetail({
                                 </div>
                               </div>
                             ))}
+                            {canAddTypedModel && (
+                              <div className={flattenedModels.length > 0 ? "border-t border-dark-border p-1" : "p-1"}>
+                                <button
+                                  type="button"
+                                  role="option"
+                                  aria-selected={false}
+                                  onClick={() => handleModelSelect(typedModel)}
+                                  className="w-full text-left px-3 py-2.5 rounded-lg text-xs text-white hover:bg-white/5 transition-all flex items-center justify-between"
+                                >
+                                  <span>
+                                    Add <span className="text-brand font-semibold">&ldquo;{typedModel}&rdquo;</span>
+                                  </span>
+                                  <span className="text-[10px] text-dark-muted">Enter</span>
+                                </button>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -761,7 +816,7 @@ export default function ProductDetail({
               !inStock ||
               added ||
               loadingModels ||
-              availableModels.length === 0 ||
+              (!allowCustomModel && availableModels.length === 0) ||
               selectedModels.length === 0
             }
             className={`w-full flex items-center justify-center gap-3 font-bold py-4.5 px-8 rounded-xl text-sm uppercase tracking-wider transition-all duration-200 min-h-[52px] ${
@@ -769,7 +824,7 @@ export default function ProductDetail({
                 ? "bg-green-500 text-white"
                 : inStock &&
                     !loadingModels &&
-                    availableModels.length > 0 &&
+                    (allowCustomModel || availableModels.length > 0) &&
                     selectedModels.length > 0
                 ? "bg-brand hover:bg-brand-dark text-black"
                 : "bg-gray-800 text-gray-500 cursor-not-allowed"

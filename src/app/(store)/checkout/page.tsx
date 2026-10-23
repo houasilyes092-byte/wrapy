@@ -20,7 +20,7 @@ import Image from "next/image";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, ready } = useCart();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -251,6 +251,10 @@ export default function CheckoutPage() {
       setError("Network error. Please try again.");
       setLoading(false);
     }
+  }
+
+  if (!ready) {
+    return <div className="min-h-[60vh]" aria-busy="true" />;
   }
 
   if (items.length === 0) {
@@ -608,14 +612,14 @@ export default function CheckoutPage() {
                       setCouponCode(e.target.value.toUpperCase())
                     }
                     placeholder="Coupon code"
-                    className="flex-1 bg-dark border border-dark-border rounded-lg px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 min-h-[48px]"
+                    className="flex-1 min-w-0 bg-dark border border-dark-border rounded-lg px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 min-h-[48px]"
                   />
 
                   <button
                     type="button"
                     onClick={() => validateCoupon()}
                     disabled={couponLoading || !couponCode.trim()}
-                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-lg transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
+                    className="shrink-0 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-lg transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
                   >
                     {couponLoading ? "..." : "Apply"}
                   </button>

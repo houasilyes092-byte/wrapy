@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { redirectToPath } from "@/lib/redirect";
+import {
+  GOOGLE_FLOW_COOKIE,
+  GOOGLE_FLOW_MAX_AGE,
+  googleConfig,
+  newGoogleFlow,
+  encodeFlow,
+  authorizationUrl,
+} from "@/lib/google-oauth";
+
+export const dynamic = "force-dynamic";
+
+function safePath(value: string | null): string | null {
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : null;
+}
+
 export async function GET(request: NextRequest) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${request.nextUrl.origin}/auth/google/callback`;
-  if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) return redirectToPath("/login?error=google_not_configured");
-  const state = crypto.randomBytes(32).toString("hex");
-  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  url.searchParams.set("client_id", clientId); url.searchParams.set("redirect_uri", redirectUri); url.searchParams.set("response_type", "code"); url.searchParams.set("scope", "openid email profile"); url.searchParams.set("state", state); url.searchParams.set("prompt", "select_account");
-  const response = NextResponse.redirect(url); response.cookies.set("wrapy-google-state", state, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 600, path: "/" }); return response;
+  const params = request.nextUrl.searchParams;
+  const mode = params.get("mode") === "register" ? "register" : "login";
+  const next = safePath(params.get("redirect"));
+
+  const config = googleConfig();
+  if (!config) {
+    console.error("[GOOGLE_NOT_CONFIGURED]", {
+      clientId: Boolean(process.env.GOOGLE_CLIENT_ID),
+      clientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      redirectUri: Boolean(process.env.GOOGLE_REDIRECT_URI),
+    });
+    return redirectToPath(`/${mode}?error=google_not_configured`);
+  }
+
+  const flow = newGoogleFlow(next, mode);
+  const response = NextResponse.redirect(authorizationUrl(config, flow), 302);
+  response.headers.set("Cache-Control", "no-store");
+  response.cookies.set(GOOGLE_FLOW_COOKIE, encodeFlow(flow), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: GOOGLE_FLOW_MAX_AGE,
+    path: "/auth/google",
+  });
+  return response;
 }

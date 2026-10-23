@@ -1,69 +1,73 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { hashPassword, createToken } from "@/lib/auth";
+import {
+  hashPassword,
+  createToken,
+  findUserByEmail,
+  maskEmail,
+  postLoginPath,
+  dbErrorCode,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+} from "@/lib/auth";
 import { registerSchema } from "@/lib/validations";
-import { cookies } from "next/headers";
+
+const EMAIL_TAKEN =
+  "Un compte existe déjà avec cet e-mail. Connectez-vous, ou utilisez « Continuer avec Google » si vous l'avez créé avec Google.";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
     const parsed = registerSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { error: parsed.error.issues[0]?.message || "Données invalides." },
         { status: 400 }
       );
     }
 
     const { name, email, phone, password } = parsed.data;
 
-    // Check if email already exists
-    const [existing] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email.toLowerCase()))
-      .limit(1);
-
-    if (existing) {
-      return NextResponse.json({ error: "Email already registered" }, { status: 400 });
+    if (await findUserByEmail(email)) {
+      return NextResponse.json({ error: EMAIL_TAKEN }, { status: 409 });
     }
 
     const passwordHash = await hashPassword(password);
 
-    const [user] = await db
-      .insert(users)
-      .values({
-        name,
-        email: email.toLowerCase(),
-        phone: phone || null,
-        passwordHash,
-        role: "customer",
-      })
-      .returning();
+    let user;
+    try {
+      [user] = await db
+        .insert(users)
+        .values({ name, email, phone: phone || null, passwordHash, role: "customer" })
+        .returning();
+    } catch (error) {
+      // Two sign-ups with the same e-mail at the same moment.
+      if (dbErrorCode(error) === "23505") {
+        return NextResponse.json({ error: EMAIL_TAKEN }, { status: 409 });
+      }
+      throw error;
+    }
+
+    console.info("[AUTH_REGISTERED]", { method: "password", email: maskEmail(email) });
 
     const token = await createToken({ userId: user.id, role: user.role });
+    const redirectTo = postLoginPath(user.role, typeof body?.redirect === "string" ? body.redirect : null);
 
-    const cookieStore = await cookies();
-    cookieStore.set("wrapy-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
+    const response = NextResponse.json({
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      redirectTo,
     });
-
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    return response;
+  } catch (error) {
+    // Never log the error message: Drizzle includes the query parameters,
+    // which here contain the password hash.
+    console.error("[AUTH_REGISTER_FAILED]", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      code: dbErrorCode(error),
     });
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur. Veuillez réessayer." }, { status: 500 });
   }
 }

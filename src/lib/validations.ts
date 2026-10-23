@@ -1,15 +1,33 @@
 import { z } from "zod";
 
+const emailField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(255, "Adresse e-mail trop longue")
+  .email("Adresse e-mail invalide");
+
+// Sign-in only checks that a password was typed: rules for new passwords must
+// never lock out accounts created under older rules.
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: emailField,
+  password: z.string().min(1, "Saisissez votre mot de passe").max(200),
 });
 
 export const registerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email"),
-  phone: z.string().optional(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères").max(255),
+  email: emailField,
+  phone: z
+    .string()
+    .trim()
+    .max(30, "Numéro de téléphone trop long")
+    .regex(/^[\d\s+\-().]*$/, "Numéro de téléphone invalide")
+    .optional(),
+  // bcrypt only reads the first 72 bytes of a password.
+  password: z
+    .string()
+    .min(8, "Le mot de passe doit contenir au moins 8 caractères")
+    .max(72, "Le mot de passe ne peut pas dépasser 72 caractères"),
 });
 
 export const productSchema = z.object({

@@ -8,7 +8,9 @@ export default function LogoutButton() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    // Replace, then refresh so no page cached for the old session is reused.
+    router.replace("/login");
+    router.refresh();
   }
 
   return (

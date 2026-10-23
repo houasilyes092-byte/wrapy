@@ -65,7 +65,7 @@ export function CategoriesGrid({ collections }: { collections: CategoryCard[] })
           phase === "static"
             ? ""
             : `transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                phase === "armed" ? "opacity-0 translate-y-5" : "opacity-100 translate-y-0"
+                phase === "armed" ? "opacity-0 translate-y-3" : "opacity-100 translate-y-0"
               }`;
 
         return (
@@ -76,7 +76,7 @@ export function CategoriesGrid({ collections }: { collections: CategoryCard[] })
           >
             <Link
               href={`/collections/${col.slug}`}
-              className={`group relative isolate flex h-full w-full overflow-hidden rounded-2xl border border-white/[0.07] outline-none transition-[border-color,transform] duration-300 ease-out hover:border-brand/40 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.985] motion-reduce:transform-none motion-reduce:transition-none ${
+              className={`group relative isolate flex h-full w-full overflow-hidden rounded-2xl border border-white/[0.07] outline-none transition-colors duration-500 ease-out hover:border-brand/40 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/60 motion-reduce:transition-none ${
                 lead
                   ? "aspect-[16/11] sm:aspect-[2/1] lg:aspect-auto lg:min-h-full"
                   : wide
@@ -92,11 +92,11 @@ export function CategoriesGrid({ collections }: { collections: CategoryCard[] })
                   alt=""
                   fill
                   sizes={lead ? "(min-width: 1024px) 640px, 100vw" : wide ? "(min-width: 1024px) 320px, 100vw" : "(min-width: 1024px) 320px, 50vw"}
-                  className="-z-10 object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06] motion-reduce:transition-none"
+                  className="-z-10 object-cover opacity-90 transition-opacity duration-500 ease-out group-hover:opacity-100 motion-reduce:transition-none"
                 />
               )}
               <span
-                className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/25 to-black/0"
+                className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/25 to-black/0 transition-opacity duration-500 ease-out group-hover:opacity-80 motion-reduce:transition-none"
                 aria-hidden="true"
               />
 

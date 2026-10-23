@@ -168,13 +168,13 @@ export default function AdminReviews() {
     },
     {
       key: "homepage",
-      header: "Homepage",
+      header: "Pin",
       render: (r: Review) => (
         <button
           onClick={() => update(r.id, { isHomepage: !r.isHomepage })}
           disabled={r.status !== "approved"}
           className={`text-sm transition-colors p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed ${r.isHomepage ? "text-brand" : "text-dark-muted hover:text-brand"}`}
-          title={r.status !== "approved" ? "Approve first" : r.isHomepage ? "Remove from homepage" : "Show on homepage"}
+          title={r.status !== "approved" ? "Approve first" : r.isHomepage ? "Unpin from homepage" : "Pin to the top of the homepage (approved reviews are shown either way)"}
         >
           <Home className="w-5 h-5" fill={r.isHomepage ? "currentColor" : "none"} strokeWidth={r.isHomepage ? 0 : 2} />
         </button>
@@ -232,7 +232,7 @@ export default function AdminReviews() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-brand">{stats.homepage}</div>
-              <div className="text-xs text-dark-muted">On Homepage</div>
+              <div className="text-xs text-dark-muted">Pinned</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-brand">{stats.averageRating > 0 ? stats.averageRating.toFixed(1) : "—"}</div>

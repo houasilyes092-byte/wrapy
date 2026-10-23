@@ -15,9 +15,9 @@ export interface PublicFaqItem {
 }
 
 export const faqItemSchema = z.object({
-  category: z.string().trim().min(1, "Catégorie requise").max(100),
-  question: z.string().trim().min(3, "Question requise").max(300),
-  answer: z.string().trim().min(1, "Réponse requise").max(4000),
+  category: z.string().trim().min(1, "Category is required").max(100),
+  question: z.string().trim().min(3, "Question is required").max(300),
+  answer: z.string().trim().min(1, "Answer is required").max(4000),
   sortOrder: z.number().int().min(0).max(9999).default(0),
   isPublished: z.boolean().default(false),
 });

@@ -44,7 +44,7 @@ export default function AdminFaq() {
       setRows(json.data || []);
       setLoadError("");
     } catch {
-      setLoadError("Impossible de charger les questions. Actualisez la page.");
+      setLoadError("Could not load the questions. Refresh the page.");
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export default function AdminFaq() {
     }).catch(() => null);
     if (!res || !res.ok) {
       const data = await res?.json().catch(() => null);
-      throw new Error(data?.error || "Enregistrement impossible. Réessayez.");
+      throw new Error(data?.error || "Could not save. Please try again.");
     }
   }
 
@@ -100,7 +100,7 @@ export default function AdminFaq() {
       setShowForm(false);
       await load();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Enregistrement impossible.");
+      setFormError(error instanceof Error ? error.message : "Could not save.");
     } finally {
       setSaving(false);
     }
@@ -111,16 +111,16 @@ export default function AdminFaq() {
       await save({ ...row, isPublished: !row.isPublished }, row.id);
       await load();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Mise à jour impossible.");
+      alert(error instanceof Error ? error.message : "Could not update.");
     }
   }
 
   async function handleDelete(row: FaqRow) {
-    if (!confirm(`Supprimer « ${row.question} » ?`)) return;
+    if (!confirm(`Delete "${row.question}"?`)) return;
     const res = await fetch(`/api/admin/faq?id=${row.id}`, { method: "DELETE" }).catch(() => null);
     if (!res || !res.ok) {
       const data = await res?.json().catch(() => null);
-      alert(data?.error || "Suppression impossible.");
+      alert(data?.error || "Could not delete.");
       return;
     }
     await load();
@@ -132,20 +132,20 @@ export default function AdminFaq() {
         <h1 className="text-2xl font-bold text-white">FAQ</h1>
         <button onClick={openNew} className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-black font-semibold px-4 py-2.5 rounded-xl text-sm transition-all">
           <Plus className="w-4 h-4" />
-          Nouvelle question
+          New question
         </button>
       </div>
       <p className="text-sm text-dark-muted mb-6">
-        Seules les questions publiées apparaissent sur /faq et sur l&apos;accueil. Les brouillons marqués « À confirmer » attendent une politique validée.
+        Only published questions appear on /faq and the homepage. Drafts starting with &quot;To confirm&quot; are waiting for a confirmed policy.
       </p>
 
       {loadError && <p role="alert" className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">{loadError}</p>}
 
       {loading ? (
-        <p className="text-sm text-dark-muted">Chargement…</p>
+        <p className="text-sm text-dark-muted">Loading…</p>
       ) : groups.length === 0 && !loadError ? (
         <div className="rounded-2xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-muted">
-          Aucune question pour le moment.
+          No questions yet.
         </div>
       ) : (
         <div className="space-y-6">
@@ -161,14 +161,14 @@ export default function AdminFaq() {
                       <p className="mt-1 text-xs text-dark-muted line-clamp-2">{row.answer}</p>
                     </div>
                     <span className={`shrink-0 text-[11px] font-medium px-2 py-1 rounded-full ${row.isPublished ? "bg-green-400/10 text-green-400" : "bg-white/5 text-dark-muted"}`}>
-                      {row.isPublished ? "Publiée" : "Brouillon"}
+                      {row.isPublished ? "Published" : "Draft"}
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button onClick={() => togglePublished(row)} className="text-dark-muted hover:text-white p-2" aria-label={row.isPublished ? "Dépublier" : "Publier"} title={row.isPublished ? "Dépublier" : "Publier"}>
+                      <button onClick={() => togglePublished(row)} className="text-dark-muted hover:text-white p-2" aria-label={row.isPublished ? "Unpublish" : "Publish"} title={row.isPublished ? "Unpublish" : "Publish"}>
                         {row.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => openEdit(row)} className="text-dark-muted hover:text-white p-2" aria-label="Modifier"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(row)} className="text-dark-muted hover:text-red-400 p-2" aria-label="Supprimer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => openEdit(row)} className="text-dark-muted hover:text-white p-2" aria-label="Edit"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(row)} className="text-dark-muted hover:text-red-400 p-2" aria-label="Delete"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </li>
                 ))}
@@ -183,19 +183,19 @@ export default function AdminFaq() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowForm(false)} />
           <div className="relative bg-dark-card rounded-2xl border border-dark-border p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">{editing ? "Modifier la question" : "Nouvelle question"}</h2>
-              <button onClick={() => setShowForm(false)} className="text-dark-muted hover:text-white" aria-label="Fermer"><X className="w-5 h-5" /></button>
+              <h2 className="text-lg font-semibold text-white">{editing ? "Edit question" : "New question"}</h2>
+              <button onClick={() => setShowForm(false)} className="text-dark-muted hover:text-white" aria-label="Close"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label htmlFor="faq-category" className="text-xs text-dark-muted block mb-1">Catégorie</label>
+                  <label htmlFor="faq-category" className="text-xs text-dark-muted block mb-1">Category</label>
                   <select id="faq-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass}>
                     {[...new Set([...FAQ_CATEGORIES, form.category])].map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="faq-order" className="text-xs text-dark-muted block mb-1">Ordre</label>
+                  <label htmlFor="faq-order" className="text-xs text-dark-muted block mb-1">Order</label>
                   <input id="faq-order" type="number" min={0} max={9999} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Math.max(0, Math.min(9999, Number(e.target.value) || 0)) })} className={inputClass} />
                 </div>
               </div>
@@ -204,16 +204,16 @@ export default function AdminFaq() {
                 <input id="faq-question" required minLength={3} maxLength={300} value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} className={inputClass} />
               </div>
               <div>
-                <label htmlFor="faq-answer" className="text-xs text-dark-muted block mb-1">Réponse</label>
+                <label htmlFor="faq-answer" className="text-xs text-dark-muted block mb-1">Answer</label>
                 <textarea id="faq-answer" required maxLength={4000} rows={5} value={form.answer} onChange={(e) => setForm({ ...form, answer: e.target.value })} className={`${inputClass} resize-y`} />
               </div>
               <label className="flex items-center gap-2.5 rounded-xl border border-dark-border px-4 py-3 text-sm text-white cursor-pointer">
                 <input type="checkbox" checked={form.isPublished} onChange={(e) => setForm({ ...form, isPublished: e.target.checked })} className="accent-brand" />
-                Publier (visible sur /faq et l&apos;accueil)
+                Publish (visible on /faq and the homepage)
               </label>
               {formError && <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">{formError}</p>}
               <button type="submit" disabled={saving} className="w-full bg-brand hover:bg-brand-dark text-black font-bold py-3 rounded-xl text-sm transition-all disabled:opacity-50">
-                {saving ? "Enregistrement…" : editing ? "Mettre à jour" : "Créer"}
+                {saving ? "Saving…" : editing ? "Update" : "Create"}
               </button>
             </form>
           </div>

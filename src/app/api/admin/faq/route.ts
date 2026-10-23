@@ -12,7 +12,7 @@ const isUuid = (value: unknown): value is string =>
 
 function failure(error: unknown) {
   console.error("[FAQ_ADMIN_FAILED]", { name: error instanceof Error ? error.name : "UnknownError", code: dbErrorCode(error) });
-  return NextResponse.json({ error: "Erreur serveur. Veuillez réessayer." }, { status: 500 });
+  return NextResponse.json({ error: "Server error. Please try again." }, { status: 500 });
 }
 
 export async function GET() {
@@ -28,7 +28,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = faqItemSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Données invalides." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid data." }, { status: 400 });
   try {
     const [row] = await db.insert(faqItems).values(parsed.data).returning();
     return NextResponse.json(row, { status: 201 });
@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!isUuid(body?.id)) return NextResponse.json({ error: "ID invalide." }, { status: 400 });
   const parsed = faqItemSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Données invalides." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid data." }, { status: 400 });
   try {
     const [row] = await db.update(faqItems).set({ ...parsed.data, updatedAt: new Date() }).where(eq(faqItems.id, body.id)).returning();
     if (!row) return NextResponse.json({ error: "Question introuvable." }, { status: 404 });

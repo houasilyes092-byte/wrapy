@@ -48,14 +48,14 @@ export function FaqAccordion({ items, idPrefix }: { items: FaqItem[]; idPrefix: 
 export function FAQSection({ items, total }: { items: FaqItem[]; total: number }) {
   if (items.length === 0) return null;
   return (
-    <section lang="fr" className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="faq-title">
+    <section className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="faq-title">
       <div className="mx-auto max-w-3xl">
-        <p className="mb-2 text-center text-xs font-medium uppercase tracking-wider text-brand">Aide</p>
-        <h2 id="faq-title" className="mb-8 text-center text-2xl sm:text-3xl font-bold text-white">Questions fréquentes</h2>
+        <p className="mb-2 text-center text-xs font-medium uppercase tracking-wider text-brand">Help</p>
+        <h2 id="faq-title" className="mb-8 text-center text-2xl sm:text-3xl font-bold text-white">Frequently Asked Questions</h2>
         <FaqAccordion items={items} idPrefix="home-faq" />
         {total > items.length && (
           <p className="mt-6 text-center">
-            <a href="/faq" className="text-sm font-medium text-brand hover:underline">Voir toutes les questions ({total})</a>
+            <a href="/faq" className="inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline">View All FAQs ({total})</a>
           </p>
         )}
       </div>

@@ -1,8 +1,11 @@
 import { db } from "@/db";
-import { products, collections } from "@/db/schema";
+import { products, collections, reviews } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
+import ProductReviews from "@/components/ProductReviews";
+import { getSession } from "@/lib/auth";
+import { getApprovedReviews, type PublicReview } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -55,11 +58,39 @@ export default async function ProductPage({ params }: PageProps) {
         .limit(4)
     : [];
 
+  // Reviews must never take the product page down: fall back to an empty list.
+  let approvedReviews: PublicReview[] = [];
+  let viewer = { signedIn: false, alreadyReviewed: false };
+  try {
+    const [list, session] = await Promise.all([getApprovedReviews(product.id), getSession()]);
+    approvedReviews = list;
+    if (session) {
+      const [mine] = await db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(and(eq(reviews.userId, session.id), eq(reviews.productId, product.id)))
+        .limit(1);
+      viewer = { signedIn: true, alreadyReviewed: Boolean(mine) };
+    }
+  } catch (error) {
+    console.error("[PRODUCT_REVIEWS_FAILED]", { name: error instanceof Error ? error.name : "UnknownError" });
+  }
+
   return (
-    <ProductDetail
-      product={product}
-      collectionName={collectionName}
-      relatedProducts={related.filter((p) => p.id !== product.id)}
-    />
+    <>
+      <ProductDetail
+        product={product}
+        collectionName={collectionName}
+        relatedProducts={related.filter((p) => p.id !== product.id)}
+      />
+      <div lang="fr" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <ProductReviews
+          productId={product.id}
+          reviews={approvedReviews}
+          viewer={viewer}
+          loginHref={`/login?redirect=${encodeURIComponent(`/skins/${product.slug}`)}`}
+        />
+      </div>
+    </>
   );
 }

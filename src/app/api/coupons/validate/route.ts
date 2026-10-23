@@ -5,17 +5,18 @@ import { eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { code, subtotal } = body;
+    const body = await req.json().catch(() => null);
+    const code = body?.code;
+    const subtotal = body?.subtotal;
 
-    if (!code || typeof subtotal !== "number") {
+    if (typeof code !== "string" || !code.trim() || code.length > 100 || typeof subtotal !== "number" || !Number.isFinite(subtotal) || subtotal < 0) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
     const [coupon] = await db
       .select()
       .from(coupons)
-      .where(and(eq(coupons.code, code.toUpperCase()), eq(coupons.isActive, true)))
+      .where(and(eq(coupons.code, code.trim().toUpperCase()), eq(coupons.isActive, true)))
       .limit(1);
 
     if (!coupon) {

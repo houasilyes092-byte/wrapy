@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Star, ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { Star, ChevronDown, BadgeCheck } from "lucide-react";
 
 type Review = {
   id: string;
@@ -10,20 +11,26 @@ type Review = {
   title: string | null;
   customerName: string | null;
   createdAt: Date | string;
+  verifiedPurchase: boolean;
 };
 
 interface ProductReviewsProps {
   productId: string;
   reviews: Review[];
+  /** Server-side view of the visitor: who may write, and where to sign in. */
+  viewer: { signedIn: boolean; alreadyReviewed: boolean };
+  loginHref: string;
 }
 
-export default function ProductReviews({ productId, reviews: initialReviews }: ProductReviewsProps) {
+export default function ProductReviews({ productId, reviews: initialReviews, viewer, loginHref }: ProductReviewsProps) {
   const [sort, setSort] = useState("newest");
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const REVIEWS_PER_PAGE = 5;
 
   const average = initialReviews.length
@@ -63,6 +70,7 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    setError("");
     try {
       const response = await fetch("/api/reviews", {
         method: "POST",
@@ -73,9 +81,10 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
       if (!response.ok) throw new Error(result.error || "Impossible d'envoyer votre avis.");
       setTitle("");
       setComment("");
-      setMessage("Merci ! Votre avis sera visible après vérification.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Erreur réseau.");
+      setSubmitted(true);
+      setMessage("Merci ! Votre avis sera visible après validation.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur réseau.");
     } finally {
       setBusy(false);
     }
@@ -96,8 +105,8 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
           </h2>
           <p className="mt-1 text-sm text-dark-muted">
             {initialReviews.length
-              ? `${average.toFixed(1)} / 5 · ${initialReviews.length} avis vérifiés`
-              : "Aucun avis publié pour le moment"}
+              ? `${average.toFixed(1)} / 5 · ${initialReviews.length} avis`
+              : "Aucun avis publié pour le moment. Soyez le premier à donner le vôtre."}
           </p>
         </div>
         {initialReviews.length > 1 && (
@@ -147,6 +156,18 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
         </div>
       )}
 
+      {submitted ? (
+        <p role="status" className="mb-8 rounded-2xl border border-brand/20 bg-brand/10 p-5 text-sm text-brand">{message}</p>
+      ) : !viewer.signedIn ? (
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dark-border bg-dark-card p-5">
+          <p className="text-sm text-gray-300">Connectez-vous pour donner votre avis sur ce skin.</p>
+          <Link href={loginHref} className="inline-flex min-h-11 items-center rounded-xl bg-brand px-5 text-sm font-bold text-black">Se connecter</Link>
+        </div>
+      ) : viewer.alreadyReviewed ? (
+        <p className="mb-8 rounded-2xl border border-dark-border bg-dark-card p-5 text-sm text-dark-muted">
+          Vous avez déjà donné votre avis sur ce produit. Merci !
+        </p>
+      ) : (
       <form onSubmit={submit} className="mb-8 rounded-2xl border border-dark-border bg-dark-card p-5" aria-label="Écrire un avis">
         <p className="mb-2 text-sm font-medium text-white">Votre note</p>
         <div className="mb-4 flex gap-1">
@@ -177,13 +198,15 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
             className="w-full rounded-xl border border-dark-border bg-dark px-4 py-3 text-sm text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50"
           />
         </div>
-        <label className="sr-only" htmlFor="review-comment">
-          Commentaire
+        <label className="block text-xs text-dark-muted mb-1.5" htmlFor="review-comment">
+          Votre avis
         </label>
         <textarea
           id="review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
+          required
+          minLength={3}
           maxLength={2000}
           rows={3}
           placeholder="Partagez votre expérience après réception de votre commande"
@@ -191,14 +214,15 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-dark-muted">
-            Réservé aux commandes livrées. Les avis sont vérifiés avant publication.
+            Les avis sont publiés après validation par l&apos;équipe Wrapy.
           </p>
           <button disabled={busy} className="min-h-11 rounded-xl bg-brand px-5 text-sm font-bold text-black disabled:opacity-50">
             {busy ? "Envoi…" : "Envoyer mon avis"}
           </button>
         </div>
-        {message && <p role="status" className="mt-3 text-sm text-brand">{message}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
       </form>
+      )}
 
       {displayedReviews.length > 0 && (
         <>
@@ -218,9 +242,17 @@ export default function ProductReviews({ productId, reviews: initialReviews }: P
                     {new Date(review.createdAt).toLocaleDateString("fr-FR")}
                   </span>
                 </div>
-                {review.title && <h4 className="mb-2 font-semibold text-white text-sm">{review.title}</h4>}
+                {review.title && <h3 className="mb-2 font-semibold text-white text-sm">{review.title}</h3>}
                 {review.comment && <p className="mb-4 text-sm leading-relaxed text-gray-300">{review.comment}</p>}
-                <p className="text-xs text-dark-muted">{review.customerName || "Client"}</p>
+                <p className="flex flex-wrap items-center gap-2 text-xs text-dark-muted">
+                  {review.customerName || "Client"}
+                  {review.verifiedPurchase && (
+                    <span className="inline-flex items-center gap-1 text-brand">
+                      <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                      Achat vérifié
+                    </span>
+                  )}
+                </p>
               </article>
             ))}
           </div>

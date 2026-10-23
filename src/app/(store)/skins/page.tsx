@@ -24,7 +24,7 @@ export default async function SkinsPage({ searchParams }: PageProps) {
     .select()
     .from(collections)
     .where(eq(collections.isActive, true))
-    .orderBy(collections.name);
+    .orderBy(asc(collections.sortOrder), asc(collections.name));
 
   // Build conditions
   const conditions = [eq(products.isActive, true), eq(products.isDeleted, false)];

@@ -2,12 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/db";
 import { products, collections, reviews, settings } from "@/db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, asc, and, sql } from "drizzle-orm";
 import HomeProductCarousel from "@/components/HomeProductCarousel";
 import { Shield, Smartphone, Sparkles, Zap, Palette, ChevronDown, ChevronUp } from "lucide-react";
 import { FAQSection, TutorialSection, type FaqItem } from "@/components/StoreExtras";
+import { getPublishedFaq } from "@/lib/faq";
 import ReviewsMarquee from "@/components/ReviewsMarquee";
-import { CategoriesGrid } from "@/components/CategoriesGrid";
+import { CategoriesGrid, type CategoryCard } from "@/components/CategoriesGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,17 @@ export default async function HomePage() {
     .select()
     .from(collections)
     .where(eq(collections.isActive, true))
-    .orderBy(collections.name);
+    .orderBy(asc(collections.sortOrder), asc(collections.name));
+  // Live product count per collection, shown on the category cards.
+  const collectionCounts = await db
+    .select({ collectionId: products.collectionId, count: sql<number>`count(*)` })
+    .from(products)
+    .where(and(eq(products.isActive, true), eq(products.isDeleted, false)))
+    .groupBy(products.collectionId);
+  const countFor = (id: string) => Number(collectionCounts.find((c) => c.collectionId === id)?.count || 0);
+  const featuredCollections: CategoryCard[] = allCollections
+    .filter((c) => c.isFeatured)
+    .map((c) => ({ id: c.id, name: c.name, slug: c.slug, description: c.description, images: c.images, productCount: countFor(c.id) }));
 
   const activeProducts = await db
     .select({
@@ -97,18 +108,13 @@ export default async function HomePage() {
   const heroButtonLink =
     siteSettings.hero_button_link || "/skins";
 
-  let faqItems: FaqItem[] = [];
+  // Published FAQ (admin -> FAQ). The homepage shows the first six.
+  let publishedFaq: FaqItem[] = [];
   try {
-    const parsed = JSON.parse(siteSettings.faq_items || "[]");
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const valid = parsed.filter((item): item is FaqItem =>
-        typeof item?.question === "string" && !!item.question.trim() &&
-        typeof item?.answer === "string" && !!item.answer.trim() &&
-        item.enabled !== false
-      );
-      if (valid.length > 0) faqItems = valid;
-    }
-  } catch { /* Keep empty or use defaults if needed */ }
+    publishedFaq = await getPublishedFaq();
+  } catch (error) {
+    console.error("[HOME_FAQ_FAILED]", { name: error instanceof Error ? error.name : "UnknownError" });
+  }
 
   // Get collection names for products
   const collectionMap: Record<string, string> = {};
@@ -203,16 +209,18 @@ export default async function HomePage() {
 
       <ReviewsMarquee reviews={approvedReviews as any} products={activeProducts} />
 
-      {/* COLLECTIONS */}
+      {/* COLLECTIONS: featured only, in the admin's order; hidden when none */}
+      {featuredCollections.length > 0 && (
       <section id="collections" className="py-12 bg-dark-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6">
             <p className="text-xs text-brand font-medium tracking-wider uppercase mb-1.5">Collections</p>
             <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Catégories</h2>
           </div>
-          <CategoriesGrid collections={allCollections as any} />
+          <CategoriesGrid collections={featuredCollections} />
         </div>
       </section>
+      )}
 
       {/* WHY WRAPY */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -240,7 +248,7 @@ export default async function HomePage() {
       </section>
 
       <TutorialSection videoUrl={siteSettings.tutorial_video_url || ""} />
-      <FAQSection items={faqItems} />
+      <FAQSection items={publishedFaq.slice(0, 6)} total={publishedFaq.length} />
 
       {/* CTA */}
       <section className="py-24 px-4 text-center">

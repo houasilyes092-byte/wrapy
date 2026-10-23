@@ -576,128 +576,15 @@ async function uploadImage(
           <div>
             <h2 className="text-lg font-semibold text-white">Tutoriel et FAQ</h2>
             <p className="mb-5 mt-1 text-xs text-dark-muted">
-              Gérez vos questions fréquentes directement ici. Activez/désactivez, réordonnez, ajoutez, modifiez ou supprimez les éléments.
+              Vidéo d&apos;application des skins. Les questions fréquentes ont leur propre page d&apos;administration.
             </p>
           </div>
           <div className="space-y-4">
             <TextInput label="URL vidéo : comment appliquer votre skin" value={settings.tutorial_video_url || ""} onChange={(value) => updateSetting("tutorial_video_url", value)} placeholder="URL fournie par votre hébergement vidéo" />
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs text-dark-muted">Questions fréquentes</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      const current = JSON.parse(settings.faq_items || "[]");
-                      current.push({ question: "", answer: "", enabled: true });
-                      updateSetting("faq_items", JSON.stringify(current));
-                    } catch {
-                      updateSetting("faq_items", JSON.stringify([{ question: "", answer: "", enabled: true }]));
-                    }
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand/20"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Ajouter
-                </button>
-              </div>
-              <div className="space-y-2">
-                {(() => {
-                  let items: Array<{ question: string; answer: string; enabled?: boolean }> = [];
-                  try {
-                    items = JSON.parse(settings.faq_items || "[]");
-                  } catch {
-                    items = [];
-                  }
-                  return items.map((item, idx) => (
-                    <div key={idx} className="rounded-xl border border-dark-border bg-dark p-3">
-                      <div className="flex items-start gap-2">
-                        <GripVertical className="mt-2 h-4 w-4 text-dark-muted" />
-                        <div className="flex-1 space-y-2">
-                          <input
-                            value={item.question}
-                            onChange={(e) => {
-                              const current = JSON.parse(settings.faq_items || "[]");
-                              current[idx].question = e.target.value;
-                              updateSetting("faq_items", JSON.stringify(current));
-                            }}
-                            placeholder="Question"
-                            className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50"
-                          />
-                          <textarea
-                            value={item.answer}
-                            onChange={(e) => {
-                              const current = JSON.parse(settings.faq_items || "[]");
-                              current[idx].answer = e.target.value;
-                              updateSetting("faq_items", JSON.stringify(current));
-                            }}
-                            placeholder="Réponse"
-                            rows={2}
-                            className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50 resize-none"
-                          />
-                          <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-2 text-xs text-dark-muted">
-                              <input
-                                type="checkbox"
-                                checked={item.enabled !== false}
-                                onChange={(e) => {
-                                  const current = JSON.parse(settings.faq_items || "[]");
-                                  current[idx].enabled = e.target.checked;
-                                  updateSetting("faq_items", JSON.stringify(current));
-                                }}
-                                className="accent-brand"
-                              />
-                              Activé
-                            </label>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => {
-                                  const current = JSON.parse(settings.faq_items || "[]");
-                                  const tmp = current[idx - 1];
-                                  current[idx - 1] = current[idx];
-                                  current[idx] = tmp;
-                                  updateSetting("faq_items", JSON.stringify(current));
-                                }}
-                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-dark-muted hover:text-white disabled:opacity-30"
-                                aria-label="Move up"
-                              >
-                                <ChevronUp className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === items.length - 1}
-                                onClick={() => {
-                                  const current = JSON.parse(settings.faq_items || "[]");
-                                  const tmp = current[idx + 1];
-                                  current[idx + 1] = current[idx];
-                                  current[idx] = tmp;
-                                  updateSetting("faq_items", JSON.stringify(current));
-                                }}
-                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-dark-muted hover:text-white disabled:opacity-30"
-                                aria-label="Move down"
-                              >
-                                <ChevronDown className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const current = JSON.parse(settings.faq_items || "[]");
-                                  current.splice(idx, 1);
-                                  updateSetting("faq_items", JSON.stringify(current));
-                                }}
-                                className="rounded-md border border-dark-border px-1.5 py-1 text-xs text-red-400 hover:bg-red-400/10"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
+            <div className="rounded-xl border border-dark-border p-4 text-sm text-dark-muted">
+              Les questions fréquentes se gèrent maintenant dans{" "}
+              <a href="/admin/faq" className="text-brand hover:underline">FAQ</a>{" "}
+              (catégorie, ordre, publication). Elles s&apos;affichent sur la page /faq et sur l&apos;accueil.
             </div>
           </div>
         </section>

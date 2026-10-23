@@ -14,8 +14,7 @@ import {
   Star,
   Settings,
   LogOut,
-  Menu,
-} from "lucide-react";
+  Menu, HelpCircle } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -26,6 +25,7 @@ const navItems = [
   { href: "/admin/coupons", label: "Coupons", icon: Tag },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
+  { href: "/admin/faq", label: "FAQ", icon: HelpCircle },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

@@ -59,6 +59,9 @@ export const collections = pgTable("collections", {
   description: text("description"),
   images: json("images").$type<string[]>().default([]).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  // Homepage "Catégories": only featured collections, lowest sortOrder first.
+  isFeatured: boolean("is_featured").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -150,9 +153,23 @@ export const reviews = pgTable("reviews", {
   rating: integer("rating").notNull(),
   comment: text("comment"),
   isApproved: boolean("is_approved").default(false).notNull(),
+  // pending -> approved | rejected; isApproved mirrors status === "approved".
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
   isHomepage: boolean("is_homepage").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({ userProductUnique: uniqueIndex("reviews_user_product_unique").on(table.userId, table.productId) }));
+
+// FAQ (homepage section + /faq page)
+export const faqItems = pgTable("faq_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  category: varchar("category", { length: 100 }).notNull(),
+  question: varchar("question", { length: 300 }).notNull(),
+  answer: text("answer").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Wishlist
 export const wishlist = pgTable("wishlist", {

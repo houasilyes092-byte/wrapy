@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
 import Image from "next/image";
+import { categoryTextureClass } from "@/lib/category-theme";
 
 export const dynamic = "force-dynamic";
 
@@ -45,20 +46,22 @@ export default async function CollectionPage({ params }: PageProps) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
-      <div className="relative isolate mb-10 min-h-[280px] overflow-hidden rounded-2xl bg-dark sm:min-h-[360px] lg:min-h-[420px]">
+      <div className="relative isolate mb-10 min-h-[240px] overflow-hidden rounded-2xl border border-white/[0.07] bg-dark sm:min-h-[360px] lg:min-h-[420px]">
+        {/* Same identity as the homepage card, so opening a category feels continuous. */}
+        <div className={`absolute inset-0 -z-10 ${categoryTextureClass(collection.slug)} cat-hero-media-in`} aria-hidden="true" />
         {coverImage && (
           <Image
             src={coverImage}
             alt={collection.name}
             fill
-            className="object-cover opacity-70"
+            className="cat-hero-media-in object-cover opacity-70"
             priority
             sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1300px) calc(100vw - 3rem), 1280px"
           />
         )}
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-dark/90 via-dark/65 to-dark/10" aria-hidden="true" />
-        <div className="relative z-10 flex min-h-[280px] items-center px-6 py-10 sm:min-h-[360px] sm:px-10 lg:min-h-[420px]">
-          <div>
+        <div className="relative z-10 flex min-h-[240px] items-center px-6 py-10 sm:min-h-[360px] sm:px-10 lg:min-h-[420px]">
+          <div className="cat-hero-in">
             <Link href="/skins" className="text-xs text-brand mb-2 block">← All Skins</Link>
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{collection.name}</h1>
             {collection.description && (

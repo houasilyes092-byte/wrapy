@@ -14,6 +14,8 @@ interface Collection {
   description: string | null;
   images: string[];
   isActive: boolean;
+  isFeatured: boolean;
+  sortOrder: number;
 }
 
 interface Pagination {
@@ -36,7 +38,12 @@ export default function AdminCollections() {
     description: "",
     images: [] as string[],
     isActive: true,
+    isFeatured: false,
+    sortOrder: 0,
   });
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 20,
@@ -52,14 +59,20 @@ export default function AdminCollections() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch(`/api/admin/collections?page=${page}&limit=20`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        return res.json();
+      })
       .then((json) => {
         if (!mounted) return;
+        setLoadError("");
         setCollections(json.data || []);
         setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
       })
       .catch((err) => {
-        if (mounted) console.error("Failed to load collections:", err);
+        if (!mounted) return;
+        console.error("Failed to load collections:", err);
+        setLoadError("Could not load collections. Refresh the page to try again.");
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -69,7 +82,9 @@ export default function AdminCollections() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", slug: "", description: "", images: [], isActive: true });
+    const nextOrder = collections.reduce((max, c) => Math.max(max, c.sortOrder || 0), 0) + 1;
+    setForm({ name: "", slug: "", description: "", images: [], isActive: true, isFeatured: false, sortOrder: nextOrder });
+    setFormError("");
     setShowForm(true);
   }
 
@@ -81,7 +96,10 @@ export default function AdminCollections() {
       description: col.description || "",
       images: col.images || [],
       isActive: col.isActive,
+      isFeatured: col.isFeatured,
+      sortOrder: col.sortOrder ?? 0,
     });
+    setFormError("");
     setShowForm(true);
   }
 
@@ -90,11 +108,19 @@ export default function AdminCollections() {
     const method = editing ? "PUT" : "POST";
     const body = editing ? { id: editing.id, ...form } : form;
 
-    await fetch("/api/admin/collections", {
+    setSaving(true);
+    setFormError("");
+    const res = await fetch("/api/admin/collections", {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }).catch(() => null);
+    setSaving(false);
+    if (!res || !res.ok) {
+      const data = await res?.json().catch(() => null);
+      setFormError(data?.error || "Could not save this collection. Please try again.");
+      return;
+    }
 
     setShowForm(false);
     // Re-fetch collections for current page
@@ -119,6 +145,12 @@ export default function AdminCollections() {
   }
 
   const columns = [
+    {
+      key: "order",
+      header: "Order",
+      className: "w-16",
+      render: (col: Collection) => <span className="text-sm text-dark-muted tabular-nums">{col.sortOrder ?? 0}</span>,
+    },
     {
       key: "collection",
       header: "Collection",
@@ -151,9 +183,14 @@ export default function AdminCollections() {
       key: "status",
       header: "Status",
       render: (col: Collection) => (
-        <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${col.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
-          {col.isActive ? "Active" : "Inactive"}
-        </span>
+        <div className="flex flex-wrap gap-1.5">
+          <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${col.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
+            {col.isActive ? "Active" : "Hidden"}
+          </span>
+          {col.isFeatured && (
+            <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-brand/10 text-brand">Homepage</span>
+          )}
+        </div>
       ),
     },
     {
@@ -217,6 +254,39 @@ export default function AdminCollections() {
                   className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 resize-none"
                 />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="collection-order" className="text-xs text-dark-muted block mb-1">Display order</label>
+                  <input
+                    id="collection-order"
+                    type="number"
+                    min={0}
+                    max={9999}
+                    value={form.sortOrder}
+                    onChange={(e) => setForm({ ...form, sortOrder: Math.max(0, Math.min(9999, Number(e.target.value) || 0)) })}
+                    className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50"
+                  />
+                  <p className="text-[11px] text-dark-muted mt-1">Lowest first</p>
+                </div>
+                <label className="flex items-center gap-2.5 rounded-xl border border-dark-border px-4 py-3 text-sm text-white cursor-pointer sm:mt-5 h-fit">
+                  <input
+                    type="checkbox"
+                    checked={form.isActive}
+                    onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+                    className="accent-brand"
+                  />
+                  Visible on the store
+                </label>
+                <label className="flex items-center gap-2.5 rounded-xl border border-dark-border px-4 py-3 text-sm text-white cursor-pointer sm:mt-5 h-fit">
+                  <input
+                    type="checkbox"
+                    checked={form.isFeatured}
+                    onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+                    className="accent-brand"
+                  />
+                  Show on homepage
+                </label>
+              </div>
               <div>
                 <ImageUpload
                   value={form.images[0] || ""}
@@ -240,12 +310,19 @@ export default function AdminCollections() {
                   maxFiles={10}
                 />
               </div>
-              <button type="submit" className="w-full bg-brand hover:bg-brand-dark text-black font-bold py-3 rounded-xl text-sm transition-all">
-                {editing ? "Update" : "Create"}
+              {formError && (
+                <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">{formError}</p>
+              )}
+              <button type="submit" disabled={saving} className="w-full bg-brand hover:bg-brand-dark text-black font-bold py-3 rounded-xl text-sm transition-all disabled:opacity-50">
+                {saving ? "Saving..." : editing ? "Update" : "Create"}
               </button>
             </form>
           </div>
         </div>
+      )}
+
+      {loadError && (
+        <p role="alert" className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">{loadError}</p>
       )}
 
       <ResponsiveTable
@@ -254,7 +331,7 @@ export default function AdminCollections() {
         keyExtractor={(col) => col.id}
         emptyMessage="No collections yet"
         loading={loading}
-        cardKeyFields={["slug", "images", "status", "actions"]}
+        cardKeyFields={["order", "slug", "images", "status", "actions"]}
       />
 
       {/* Pagination */}

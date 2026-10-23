@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Trash2, X as XIcon, ChevronLeft, ChevronRight, Filter, Star, Loader2, Home } from "lucide-react";
+import { Check, Trash2, X as XIcon, ChevronLeft, ChevronRight, Filter, Home, RotateCcw, BadgeCheck } from "lucide-react";
 import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
 
 interface Review {
@@ -13,9 +13,17 @@ interface Review {
   rating: number;
   comment: string | null;
   isApproved: boolean;
+  status: "pending" | "approved" | "rejected";
   isHomepage: boolean;
   createdAt: string;
+  verifiedPurchase: boolean;
 }
+
+const STATUS_STYLE: Record<Review["status"], { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-yellow-400/10 text-yellow-400" },
+  approved: { label: "Approved", className: "bg-green-400/10 text-green-400" },
+  rejected: { label: "Rejected", className: "bg-red-400/10 text-red-400" },
+};
 
 interface Pagination {
   page: number;
@@ -73,7 +81,7 @@ export default function AdminReviews() {
         if (!mounted) return;
         setReviews(json.data || []);
         setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
-        setStats(json.stats || { total: 0, approved: 0, pending: 0, rejected: 0, averageRating: 0 });
+        setStats(json.stats || { total: 0, approved: 0, pending: 0, rejected: 0, homepage: 0, averageRating: 0 });
       })
       .catch((err) => {
         if (mounted) console.error("Failed to fetch reviews:", err);
@@ -84,22 +92,19 @@ export default function AdminReviews() {
     return () => { mounted = false; };
   }, [pagination.page, pagination.limit, filters.status, filters.rating, filters.search]);
 
-  async function toggleApproval(id: string, isApproved: boolean) {
-    await fetch("/api/admin/reviews", {
+  async function update(id: string, change: { status?: Review["status"]; isHomepage?: boolean }) {
+    const res = await fetch("/api/admin/reviews", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, isApproved }),
-    });
-    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, isApproved } : r)));
-  }
-
-  async function toggleHomepage(id: string, isHomepage: boolean) {
-    await fetch("/api/admin/reviews", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, isHomepage }),
-    });
-    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, isHomepage } : r)));
+      body: JSON.stringify({ id, ...change }),
+    }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (!res || !res.ok) {
+      alert(body?.error || "Could not update this review. Please try again.");
+      return;
+    }
+    // The server decides the final state (e.g. rejecting removes it from the homepage).
+    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, ...body } : r)));
   }
 
   async function handleDelete(id: string) {
@@ -149,9 +154,16 @@ export default function AdminReviews() {
       key: "status",
       header: "Status",
       render: (r: Review) => (
-        <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${r.isApproved ? "bg-green-400/10 text-green-400" : "bg-yellow-400/10 text-yellow-400"}`}>
-          {r.isApproved ? "Approved" : "Pending"}
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${STATUS_STYLE[r.status]?.className ?? STATUS_STYLE.pending.className}`}>
+            {STATUS_STYLE[r.status]?.label ?? r.status}
+          </span>
+          {r.verifiedPurchase && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-brand" title="Delivered order with this product">
+              <BadgeCheck className="w-3.5 h-3.5" /> Verified
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -159,9 +171,10 @@ export default function AdminReviews() {
       header: "Homepage",
       render: (r: Review) => (
         <button
-          onClick={() => toggleHomepage(r.id, !r.isHomepage)}
-          className={`text-sm transition-colors p-1 rounded ${r.isHomepage ? "text-brand" : "text-dark-muted hover:text-brand"}`}
-          title={r.isHomepage ? "Remove from homepage" : "Show on homepage"}
+          onClick={() => update(r.id, { isHomepage: !r.isHomepage })}
+          disabled={r.status !== "approved"}
+          className={`text-sm transition-colors p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed ${r.isHomepage ? "text-brand" : "text-dark-muted hover:text-brand"}`}
+          title={r.status !== "approved" ? "Approve first" : r.isHomepage ? "Remove from homepage" : "Show on homepage"}
         >
           <Home className="w-5 h-5" fill={r.isHomepage ? "currentColor" : "none"} strokeWidth={r.isHomepage ? 0 : 2} />
         </button>
@@ -171,16 +184,22 @@ export default function AdminReviews() {
       key: "actions",
       header: "Actions",
       align: "right" as const,
-      className: "w-28",
+      className: "w-36",
       render: (r: Review) => (
         <div className="flex items-center justify-end gap-1">
-          {r.isApproved ? (
-            <button onClick={() => toggleApproval(r.id, false)} className="text-dark-muted hover:text-yellow-400 transition-colors p-2" title="Unapprove">
+          {r.status !== "approved" && (
+            <button onClick={() => update(r.id, { status: "approved" })} className="text-dark-muted hover:text-green-400 transition-colors p-2" title="Approve" aria-label="Approve">
+              <Check className="w-4 h-4" />
+            </button>
+          )}
+          {r.status !== "rejected" && (
+            <button onClick={() => update(r.id, { status: "rejected" })} className="text-dark-muted hover:text-red-400 transition-colors p-2" title="Reject" aria-label="Reject">
               <XIcon className="w-4 h-4" />
             </button>
-          ) : (
-            <button onClick={() => toggleApproval(r.id, true)} className="text-dark-muted hover:text-green-400 transition-colors p-2" title="Approve">
-              <Check className="w-4 h-4" />
+          )}
+          {r.status !== "pending" && (
+            <button onClick={() => update(r.id, { status: "pending" })} className="text-dark-muted hover:text-yellow-400 transition-colors p-2" title="Back to pending" aria-label="Back to pending">
+              <RotateCcw className="w-4 h-4" />
             </button>
           )}
           <button onClick={() => handleDelete(r.id)} className="text-dark-muted hover:text-red-400 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
@@ -194,7 +213,7 @@ export default function AdminReviews() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold text-white">Reviews</h1>
         <div className="flex items-center gap-4">
-          <div className="grid grid-cols-5 gap-3 bg-dark-card border border-dark-border rounded-xl p-4 min-w-[450px]">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 bg-dark-card border border-dark-border rounded-xl p-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-white">{stats.total}</div>
               <div className="text-xs text-dark-muted">Total</div>
@@ -206,6 +225,10 @@ export default function AdminReviews() {
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
               <div className="text-xs text-dark-muted">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-400">{stats.rejected}</div>
+              <div className="text-xs text-dark-muted">Rejected</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-brand">{stats.homepage}</div>
@@ -238,6 +261,7 @@ export default function AdminReviews() {
           <option value="">All Status</option>
           <option value="approved">Approved</option>
           <option value="pending">Pending</option>
+          <option value="rejected">Rejected</option>
         </select>
         <select
           value={filters.rating}

@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { settings } from "@/db/schema";
+import { settings, faqItems } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,10 @@ export async function GET() {
     for (const row of rows) {
       if (publicKeys.includes(row.key)) result[row.key] = row.value;
     }
+
+    // Lets the footer link to /faq only when it has published questions.
+    const [faq] = await db.select({ count: sql<number>`count(*)` }).from(faqItems).where(eq(faqItems.isPublished, true));
+    result.has_faq = Number(faq?.count || 0) > 0 ? "true" : "false";
 
     return NextResponse.json(result);
   } catch (error) {

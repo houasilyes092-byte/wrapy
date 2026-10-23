@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { X, Star, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 interface ReviewSubmissionModalProps {
@@ -11,7 +12,8 @@ interface ReviewSubmissionModalProps {
 }
 
 export default function ReviewSubmissionModal({ isOpen, onClose, productId, productName }: ReviewSubmissionModalProps) {
-  const [customerName, setCustomerName] = useState("");
+  // Reviews need an account (one review per customer and product).
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
@@ -19,18 +21,24 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (active) setSignedIn(Boolean(data?.user)); })
+      .catch(() => { if (active) setSignedIn(false); });
+    return () => { active = false; };
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!customerName.trim()) {
-      setErrorMessage("Please enter your name.");
-      return;
-    }
     if (rating === 0) {
       setErrorMessage("Please select a rating.");
       return;
     }
-    if (!comment.trim()) {
+    if (comment.trim().length < 3) {
       setErrorMessage("Please write your review.");
       return;
     }
@@ -42,7 +50,7 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
       const response = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, rating, title, comment, customerName }),
+        body: JSON.stringify({ productId, rating, title, comment }),
       });
 
       const data = await response.json();
@@ -52,7 +60,6 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
       }
 
       setStatus("success");
-      setCustomerName("");
       setTitle("");
       setComment("");
       setRating(0);
@@ -96,6 +103,21 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
               Close
             </button>
           </div>
+        ) : signedIn === null ? (
+          <div className="flex justify-center py-12" aria-busy="true">
+            <Loader2 className="w-6 h-6 animate-spin text-brand" />
+          </div>
+        ) : !signedIn ? (
+          <div className="text-center py-8">
+            <h3 className="text-xl font-bold text-white mb-2">Leave a Review</h3>
+            <p className="text-dark-muted mb-6">Sign in to review <span className="text-brand font-medium">{productName}</span>.</p>
+            <Link
+              href="/login?redirect=%2F"
+              className="inline-flex bg-brand hover:bg-brand-dark text-black font-bold px-6 py-3 rounded-xl transition-colors"
+            >
+              Sign in
+            </Link>
+          </div>
         ) : (
           <form onSubmit={handleSubmit}>
             <div className="mb-6">
@@ -104,23 +126,6 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="customerName" className="block text-sm font-medium text-white mb-1.5">
-                  Your Name <span className="text-brand">*</span>
-                </label>
-                <input
-                  id="customerName"
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="John Doe"
-                  maxLength={100}
-                  required
-                  disabled={status === "submitting"}
-                  className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder:text-dark-muted focus:outline-none focus:border-brand/50 disabled:opacity-50 transition-colors"
-                />
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-white mb-1.5">
                   Rating <span className="text-brand">*</span>
@@ -174,6 +179,7 @@ export default function ReviewSubmissionModal({ isOpen, onClose, productId, prod
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Share your experience with this product..."
+                  minLength={3}
                   maxLength={2000}
                   rows={4}
                   required

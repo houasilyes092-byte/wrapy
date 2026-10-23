@@ -48,11 +48,18 @@ export const productSchema = z.object({
 });
 
 export const collectionSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  slug: z.string().min(1, "Slug is required"),
-  description: z.string().optional(),
-  images: z.array(z.string()).default([]),
+  name: z.string().trim().min(1, "Name is required").max(255),
+  slug: z
+    .string()
+    .trim()
+    .min(1, "Slug is required")
+    .max(255)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug: lowercase letters, numbers and hyphens only"),
+  description: z.string().max(2000).optional().nullable(),
+  images: z.array(z.string().max(500)).max(20).default([]),
   isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  sortOrder: z.number().int().min(0).max(9999).default(0),
 });
 
 export const checkoutSchema = z.object({

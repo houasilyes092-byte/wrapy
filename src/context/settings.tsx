@@ -22,6 +22,7 @@ interface Settings {
   featured_title?: string;
   tutorial_video_url?: string;
   faq_items?: string;
+  has_faq?: string;
   instagram_url?: string;
   facebook_url?: string;
   phone_number?: string;

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { collections, products } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { requireAdmin } from "@/lib/auth";
+import { and, asc, eq, sql } from "drizzle-orm";
+import { requireAdmin, dbErrorCode } from "@/lib/auth";
 import { collectionSchema } from "@/lib/validations";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     db
       .select()
       .from(collections)
-      .orderBy(desc(collections.createdAt))
+      .orderBy(asc(collections.sortOrder), asc(collections.name))
       .limit(limit)
       .offset(offset),
     db
@@ -47,37 +47,42 @@ export async function GET(req: NextRequest) {
   });
 }
 
+function collectionValues(data: ReturnType<typeof collectionSchema.parse>) {
+  return {
+    name: data.name,
+    slug: data.slug,
+    description: data.description || null,
+    images: data.images || [],
+    isActive: data.isActive,
+    isFeatured: data.isFeatured,
+    sortOrder: data.sortOrder,
+  };
+}
+
+function saveError(error: unknown) {
+  if (dbErrorCode(error) === "23505") {
+    return NextResponse.json({ error: "A collection with this slug already exists." }, { status: 409 });
+  }
+  console.error("[COLLECTION_SAVE_FAILED]", { name: error instanceof Error ? error.name : "UnknownError", code: dbErrorCode(error) });
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+}
+
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const parsed = collectionSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+  }
+
   try {
-    const body = await req.json();
-    const parsed = collectionSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || "Invalid input" },
-        { status: 400 }
-      );
-    }
-
-    const [collection] = await db
-      .insert(collections)
-      .values({
-        name: parsed.data.name,
-        slug: parsed.data.slug,
-        description: parsed.data.description || null,
-        images: parsed.data.images || [],
-        isActive: parsed.data.isActive,
-      })
-      .returning();
-
+    const [collection] = await db.insert(collections).values(collectionValues(parsed.data)).returning();
     return NextResponse.json(collection, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    return saveError(error);
   }
 }
 
@@ -87,29 +92,28 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const body = await req.json().catch(() => null);
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return NextResponse.json({ error: "ID is required" }, { status: 400 });
+  }
+  const parsed = collectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+  }
+
   try {
-    const body = await req.json();
-    const { id, ...data } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "ID is required" }, { status: 400 });
-    }
-
     const [collection] = await db
       .update(collections)
-      .set({
-        name: data.name,
-        slug: data.slug,
-        description: data.description || null,
-        images: data.images || [],
-        isActive: data.isActive ?? true,
-      })
+      .set(collectionValues(parsed.data))
       .where(eq(collections.id, id))
       .returning();
-
+    if (!collection) {
+      return NextResponse.json({ error: "Collection not found" }, { status: 404 });
+    }
     return NextResponse.json(collection);
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    return saveError(error);
   }
 }
 

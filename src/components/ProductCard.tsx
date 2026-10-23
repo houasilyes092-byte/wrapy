@@ -23,7 +23,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { isInWishlist, toggleItem, loading } = useWishlist();
-  const mainImage = product.images[0] || "/placeholder.jpg";
+  const mainImage = product.images[0] || "/placeholder.svg";
   const inWishlist = isInWishlist(product.id);
   const [toggling, setToggling] = useState(false);
 

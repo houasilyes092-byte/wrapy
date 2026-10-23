@@ -386,7 +386,7 @@ export default function ProductDetail({
   const mainImage =
     product.images[selectedImage] ||
     product.images[0] ||
-    "/placeholder.jpg";
+    "/placeholder.svg";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

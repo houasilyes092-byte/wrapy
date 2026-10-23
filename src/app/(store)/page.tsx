@@ -78,7 +78,7 @@ export default async function HomePage() {
   }
 
   const heroMedia =
-    siteSettings.hero_media || siteSettings.hero_image || "/hero-skin.jpg";
+    siteSettings.hero_media || siteSettings.hero_image || "";
 
   const heroMediaType =
     siteSettings.hero_media_type ||
@@ -121,7 +121,7 @@ export default async function HomePage() {
       {/* HERO */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          {heroMediaType === "video" || heroMedia?.match(/\.(mp4|webm)$/i) ? (
+          {heroMedia && (heroMediaType === "video" || heroMedia.match(/\.(mp4|webm)$/i)) ? (
             <video
               src={heroMedia}
               className="w-full h-full object-cover opacity-40"
@@ -131,7 +131,7 @@ export default async function HomePage() {
               playsInline
               poster={siteSettings.hero_poster || undefined}
             />
-          ) : (
+          ) : heroMedia ? (
             <Image
               src={heroMedia}
               alt="Wrapy Hero"
@@ -140,7 +140,7 @@ export default async function HomePage() {
               priority
               sizes="100vw"
             />
-          )}
+          ) : null}
           <div className="absolute inset-0 bg-gradient-to-b from-dark/60 via-dark/80 to-dark" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-fade-in">

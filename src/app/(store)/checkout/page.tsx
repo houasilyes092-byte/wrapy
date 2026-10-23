@@ -530,7 +530,7 @@ export default function CheckoutPage() {
                   {/* Product image */}
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-dark shrink-0 relative">
                     <Image
-                      src={item.productImage || "/placeholder.jpg"}
+                      src={item.productImage || "/placeholder.svg"}
                       alt={item.productName}
                       fill
                       className="object-cover"

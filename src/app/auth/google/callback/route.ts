@@ -1,14 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createToken, hashPassword } from "@/lib/auth";
+import { redirectToPath } from "@/lib/redirect";
 
 export async function GET(request: NextRequest) {
   const jar = await cookies(); const state = request.nextUrl.searchParams.get("state"); const savedState = jar.get("wrapy-google-state")?.value;
-  const fail = (reason: string) => { const response = NextResponse.redirect(new URL(`/login?error=${reason}`, request.url)); response.cookies.delete("wrapy-google-state"); return response; };
+  const fail = (reason: string) => { const response = redirectToPath(`/login?error=${reason}`); response.cookies.delete("wrapy-google-state"); return response; };
   if (!state || !savedState || state !== savedState) return fail("google_state");
   const code = request.nextUrl.searchParams.get("code"); if (!code) return fail("google_denied");
   const clientId = process.env.GOOGLE_CLIENT_ID; const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       [user] = await db.insert(users).values({ name: profile.name?.slice(0,255) || email.split("@")[0], email, passwordHash: await hashPassword(crypto.randomBytes(48).toString("hex")), role: "customer" }).returning();
     }
     const sessionToken = await createToken({ userId: user.id, role: user.role });
-    const response = NextResponse.redirect(new URL(user.role === "admin" ? "/admin" : "/account", request.url));
+    const response = redirectToPath(user.role === "admin" ? "/admin" : "/account");
     response.cookies.set("wrapy-token", sessionToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 60 * 60 * 24 * 7, path: "/" }); response.cookies.delete("wrapy-google-state"); return response;
   } catch (error) { console.error("Google sign-in error:", error); return fail("google_auth"); }
 }

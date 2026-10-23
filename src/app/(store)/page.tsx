@@ -152,7 +152,7 @@ export default async function HomePage() {
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-fade-in">
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 rounded-full px-4 py-1.5 mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            <span className="text-xs text-brand font-medium tracking-wider uppercase">New Collection 2025</span>
+            <span className="text-xs text-brand font-medium tracking-wider uppercase">CURATED FOR YOU</span>
           </div>
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter text-white leading-[0.9]">
             WRAP YOUR<br />

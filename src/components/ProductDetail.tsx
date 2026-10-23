@@ -788,7 +788,7 @@ export default function ProductDetail({
             ) : (
               <>
                 <ShoppingBag className="w-5 h-5" />
-                Add to Cart â€”{" "}
+                Add to Cart —{" "}
                 {formatPrice(
                   selectedModels.reduce(
                     (sum, m) => sum + product.price * m.quantity,

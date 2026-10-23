@@ -187,7 +187,7 @@ export default async function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Featured Skins</h2>
           </div>
           <Link href="/skins" className="text-sm text-gray-400 hover:text-brand transition-colors hidden sm:block">
-            View All â†’
+            View All →
           </Link>
         </div>
         <HomeProductCarousel products={featuredProducts.map((p) => ({
@@ -196,7 +196,7 @@ export default async function HomePage() {
         }))} />
         <div className="mt-8 text-center sm:hidden">
           <Link href="/skins" className="text-sm text-brand font-medium">
-            View All Products â†’
+            View All Products →
           </Link>
         </div>
       </section>
@@ -222,7 +222,7 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
           {[
-            { icon: Sparkles, title: "Premium Materials", desc: "3Mâ„¢ quality vinyl that lasts" },
+            { icon: Sparkles, title: "Premium Materials", desc: "3M™ quality vinyl that lasts" },
             { icon: Smartphone, title: "Precise Fit", desc: "Laser-cut for every device" },
             { icon: Zap, title: "Easy Install", desc: "Bubble-free application" },
             { icon: Shield, title: "Full Protection", desc: "Scratch & fingerprint resistant" },

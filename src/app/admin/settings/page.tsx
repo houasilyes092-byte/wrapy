@@ -839,7 +839,7 @@ async function uploadImage(
         <div className="flex items-center justify-between pb-10">
           {saved && (
             <span className="text-sm text-brand font-medium">
-              Settings saved successfully âœ“
+              Settings saved successfully ✓
             </span>
           )}
 

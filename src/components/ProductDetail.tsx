@@ -18,6 +18,7 @@ import {
   Trash2,
   Heart,
 } from "lucide-react";
+import { phoneModelKey } from "@/lib/phone-models";
 import Link from "next/link";
 import ProductCard from "./ProductCard";
 
@@ -161,9 +162,9 @@ export default function ProductDetail({
       return phoneModels;
     }
 
-    const compatible = new Set(product.compatibleModels);
+    const compatible = new Set(product.compatibleModels.map(phoneModelKey));
 
-    return phoneModels.filter((model) => compatible.has(model.name));
+    return phoneModels.filter((model) => compatible.has(phoneModelKey(model.name)));
   }, [phoneModels, product.compatibleModels]);
 
   /*

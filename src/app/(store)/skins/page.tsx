@@ -3,6 +3,8 @@ import { products, collections, reviews } from "@/db/schema";
 import { eq, and, ilike, desc, asc, inArray, sql } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/FilterSidebar";
+import { getActivePhoneModels } from "@/lib/phone-models.server";
+import { productFitsModel } from "@/lib/phone-models";
 
 export const dynamic = "force-dynamic";
 
@@ -78,13 +80,13 @@ export default async function SkinsPage({ searchParams }: PageProps) {
     .where(and(...conditions))
     .orderBy(orderBy);
 
-  // Filter by phone model (client-side since it's a JSON array)
+  const phoneModelOptions = await getActivePhoneModels();
+
+  // Phone model filter: exact model (case/spacing-insensitive, so "iPhone 15"
+  // no longer also matches "iPhone 15 Pro Max"). Products with no compatibility
+  // list are made for any model and stay listed.
   if (params.model) {
-    allProducts = allProducts.filter((p) =>
-      p.compatibleModels.some((m: string) =>
-        m.toLowerCase().includes(params.model!.toLowerCase())
-      )
-    );
+    allProducts = allProducts.filter((p) => productFitsModel(p.compatibleModels, params.model!));
   }
 
   if (params.sort === "rating" && allProducts.length) {
@@ -126,7 +128,7 @@ export default async function SkinsPage({ searchParams }: PageProps) {
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Filters */}
-        <FilterSidebar collections={allCollections} />
+        <FilterSidebar collections={allCollections} phoneModels={phoneModelOptions} />
 
         {/* Products */}
         <div className="flex-1">

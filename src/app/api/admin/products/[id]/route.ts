@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { products } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
+import { resolvePhoneModelNames } from "@/lib/phone-models.server";
+import { phoneModelKey } from "@/lib/phone-models";
 import { productSchema } from "@/lib/validations";
 import { revalidatePath } from "next/cache";
 
@@ -30,6 +32,24 @@ export async function PUT(
 
     const data = parsed.data;
 
+    // Phone models must exist in the phone_models table; stored with its exact names.
+    const models = await resolvePhoneModelNames(data.compatibleModels);
+    // A model deleted from Admin -> Phone Models may still be saved on this
+    // product: keep it rather than block the save (the form lets admins remove it).
+    if (models.unknown.length > 0) {
+      const [current] = await db.select({ compatibleModels: products.compatibleModels }).from(products).where(eq(products.id, id));
+      const saved = new Set((current?.compatibleModels ?? []).map(phoneModelKey));
+      const kept = models.unknown.filter((name) => saved.has(phoneModelKey(name)));
+      models.names.push(...kept);
+      models.unknown = models.unknown.filter((name) => !saved.has(phoneModelKey(name)));
+    }
+    if (models.unknown.length > 0) {
+      return NextResponse.json(
+        { error: `Unknown phone model: ${models.unknown.slice(0, 3).join(", ")}. Add it in Admin → Phone Models first.` },
+        { status: 400 }
+      );
+    }
+
     const [product] = await db
       .update(products)
       .set({
@@ -39,7 +59,7 @@ export async function PUT(
         price: data.price,
         comparePrice: data.comparePrice || null,
         images: data.images,
-        compatibleModels: data.compatibleModels,
+        compatibleModels: models.names,
         stock: data.stock,
         madeToOrder: data.madeToOrder,
         collectionId: data.collectionId || null,

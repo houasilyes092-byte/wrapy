@@ -1,20 +1,11 @@
-import { db } from "@/db";
-import { phoneModels } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { getActivePhoneModels } from "@/lib/phone-models.server";
 
 export const dynamic = "force-dynamic";
 
+// Active phone models for every selector (product page, product form).
 export async function GET() {
-  const models = await db
-    .select({
-      id: phoneModels.id,
-      brand: phoneModels.brand,
-      name: phoneModels.name,
-      isActive: phoneModels.isActive,
-    })
-    .from(phoneModels)
-    .where(eq(phoneModels.isActive, true))
-    .orderBy(asc(phoneModels.brand), asc(phoneModels.name));
-
-  return Response.json(models);
+  const models = await getActivePhoneModels();
+  return Response.json(models.map((model) => ({ ...model, isActive: true })), {
+    headers: { "Cache-Control": "no-store" },
+  });
 }

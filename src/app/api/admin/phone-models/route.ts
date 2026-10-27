@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { phoneModels } from "@/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
+import { cleanPhoneModelName, PHONE_MODEL_NAME_MAX } from "@/lib/phone-models";
+import { findSimilarPhoneModel } from "@/lib/phone-models.server";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -61,13 +63,25 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const brand = String(body.brand || "").trim();
-    const name = String(body.name || "").trim();
+    const brand = cleanPhoneModelName(String(body.brand || ""));
+    const name = cleanPhoneModelName(String(body.name || ""));
 
     if (!brand || !name) {
       return NextResponse.json(
         { error: "Brand and name are required" },
         { status: 400 }
+      );
+    }
+    if (brand.length > 100 || name.length > PHONE_MODEL_NAME_MAX) {
+      return NextResponse.json({ error: "Brand or name is too long" }, { status: 400 });
+    }
+
+    // "S22", "s 22" and "s-22" are the same phone: one entry only.
+    const similar = await findSimilarPhoneModel(name);
+    if (similar) {
+      return NextResponse.json(
+        { error: `This phone model already exists as "${similar.name}"` },
+        { status: 409 }
       );
     }
 
@@ -87,7 +101,7 @@ export async function POST(req: Request) {
     if (message.includes("unique")) {
       return NextResponse.json(
         { error: "This phone model already exists" },
-        { status: 400 }
+        { status: 409 }
       );
     }
 

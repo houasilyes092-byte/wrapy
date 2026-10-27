@@ -3,18 +3,26 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { useState } from "react";
-import { ALL_PHONE_MODELS, PHONE_MODELS } from "@/lib/constants";
+import { groupPhoneModelsByBrand, phoneModelLooseKey, type PhoneModelOption } from "@/lib/phone-models";
 
 interface FilterSidebarProps {
   collections: { id: string; name: string; slug: string }[];
+  /** Active models from the phone_models table (same source as the product page and admin). */
+  phoneModels: PhoneModelOption[];
 }
 
-export default function FilterSidebar({ collections }: FilterSidebarProps) {
+export default function FilterSidebar({ collections, phoneModels }: FilterSidebarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const currentCollection = searchParams.get("collection") || "";
-  const currentModel = searchParams.get("model") || "";
+  const requestedModel = searchParams.get("model") || "";
+  // Old links may spell a model differently ("iPhone 16 Pro Max" vs "iphone 16 pro max").
+  const currentModel = requestedModel
+    ? phoneModels.find((m) => phoneModelLooseKey(m.name) === phoneModelLooseKey(requestedModel))?.name ?? requestedModel
+    : "";
+  const modelGroups = groupPhoneModelsByBrand(phoneModels);
+  const modelIsListed = !currentModel || phoneModels.some((m) => m.name === currentModel);
   const currentSort = searchParams.get("sort") || "";
   const currentQ = searchParams.get("q") || "";
   const [collectionsOpen, setCollectionsOpen] = useState(false);
@@ -107,23 +115,22 @@ export default function FilterSidebar({ collections }: FilterSidebarProps) {
 
       {/* Phone model */}
       <div>
-        <label className="text-xs text-dark-muted uppercase tracking-wider font-medium block mb-2">Phone Model</label>
+        <label htmlFor="filter-phone-model" className="text-xs text-dark-muted uppercase tracking-wider font-medium block mb-2">Phone Model</label>
         <select
+          id="filter-phone-model"
           value={currentModel}
           onChange={(e) => updateParam("model", e.target.value)}
           className="w-full bg-dark-card border border-dark-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand/50 appearance-none"
         >
           <option value="">All Models</option>
-          <optgroup label="iPhone">
-            {PHONE_MODELS.iPhone.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Samsung">
-            {PHONE_MODELS.Samsung.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </optgroup>
+          {!modelIsListed && <option value={currentModel}>{currentModel}</option>}
+          {modelGroups.map(([brand, models]) => (
+            <optgroup key={brand} label={brand}>
+              {models.map((m) => (
+                <option key={m.id} value={m.name}>{m.name}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </div>
     </aside>

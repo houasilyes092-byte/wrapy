@@ -1,36 +1,4 @@
-export const PHONE_MODELS = {
-  iPhone: [
-    "iPhone 16 Pro Max",
-    "iPhone 16 Pro",
-    "iPhone 16 Plus",
-    "iPhone 16",
-    "iPhone 15 Pro Max",
-    "iPhone 15 Pro",
-    "iPhone 15 Plus",
-    "iPhone 15",
-    "iPhone 14 Pro Max",
-    "iPhone 14 Pro",
-    "iPhone 14 Plus",
-    "iPhone 14",
-    "iPhone 13 Pro Max",
-    "iPhone 13 Pro",
-    "iPhone 13",
-    "iPhone 13 Mini",
-  ],
-  Samsung: [
-    "Galaxy S25 Ultra",
-    "Galaxy S25+",
-    "Galaxy S25",
-    "Galaxy S24 Ultra",
-    "Galaxy S24+",
-    "Galaxy S24",
-  ],
-} as const;
-
-export const ALL_PHONE_MODELS = [
-  ...PHONE_MODELS.iPhone,
-  ...PHONE_MODELS.Samsung,
-];
+// Phone models live in the phone_models table (see src/lib/phone-models.ts).
 
 export const ORDER_STATUSES = [
   "pending",

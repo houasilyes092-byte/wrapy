@@ -37,7 +37,7 @@ export const productSchema = z.object({
   price: z.number().min(0, "Price must be positive"),
   comparePrice: z.number().min(0).optional().nullable(),
   images: z.array(z.string()).default([]),
-  compatibleModels: z.array(z.string()).default([]),
+  compatibleModels: z.array(z.string().trim().min(1).max(255)).max(500).default([]),
   stock: z.number().int().min(0).default(0),
   madeToOrder: z.boolean().default(false),
   collectionId: z.string().uuid().optional().nullable(),

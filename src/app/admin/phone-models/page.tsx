@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
+import { sortPhoneModels } from "@/lib/phone-models";
 
 interface PhoneModel {
   id: string;
@@ -39,7 +40,7 @@ export default function PhoneModelsPage() {
 
   async function fetchModels(page = 1) {
     try {
-      const res = await fetch(`/api/admin/phone-models?page=${page}&limit=20`);
+      const res = await fetch(`/api/admin/phone-models?page=${page}&limit=100`);
       const json = await res.json();
 
       if (!res.ok) {
@@ -89,6 +90,7 @@ export default function PhoneModelsPage() {
       }
 
       setModels((current) => [...current, data]);
+      setPagination((current) => ({ ...current, total: current.total + 1 }));
       setName("");
     } catch {
       setError("Network error");
@@ -220,7 +222,7 @@ export default function PhoneModelsPage() {
       </form>
 
       <ResponsiveTable
-        items={models}
+        items={sortPhoneModels(models)}
         columns={columns}
         keyExtractor={(m) => m.id}
         emptyMessage="No phone models yet."

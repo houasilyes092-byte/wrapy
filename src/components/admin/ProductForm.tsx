@@ -7,18 +7,14 @@ import { Plus, X, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { uploadFile } from "@/lib/upload-client";
+import { groupPhoneModelsByBrand, phoneModelKey, type PhoneModelOption } from "@/lib/phone-models";
 
 interface Collection {
   id: string;
   name: string;
 }
 
-interface PhoneModel {
-  id: string;
-  brand: string;
-  name: string;
-  isActive: boolean;
-}
+type PhoneModel = PhoneModelOption;
 
 interface ProductFormProps {
   product?: {
@@ -38,6 +34,23 @@ interface ProductFormProps {
     isFeatured: boolean;
     isActive: boolean;
   };
+}
+
+/**
+ * The admin list endpoints are paginated (20 per page by default, 100 max).
+ * The product form needs every row, so it walks all pages.
+ */
+async function fetchAllPages<T>(endpoint: string, label: string): Promise<T[]> {
+  const rows: T[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const response = await fetch(`${endpoint}?page=${page}&limit=100`, { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Failed to load ${label}`);
+    if (!Array.isArray(payload.data)) throw new Error(`Invalid ${label} response`);
+    rows.push(...payload.data);
+    if (!payload.pagination?.hasNext) return rows;
+  }
+  return rows;
 }
 
 export default function ProductForm({ product }: ProductFormProps) {
@@ -152,12 +165,9 @@ export default function ProductForm({ product }: ProductFormProps) {
 
 useEffect(() => {
     let mounted = true;
-    fetch("/api/admin/collections")
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Failed to load collections");
-        if (!Array.isArray(payload.data)) throw new Error("Invalid collections response");
-        if (mounted) setCollections(payload.data);
+    fetchAllPages<Collection>("/api/admin/collections", "collections")
+      .then((rows) => {
+        if (mounted) setCollections(rows);
       })
       .catch((loadError: unknown) => {
         if (!mounted) return;
@@ -177,13 +187,13 @@ useEffect(() => {
     setPhoneModelsLoading(true);
     setPhoneModelsError("");
 
-    fetch("/api/admin/phone-models")
+    // Same source as the storefront: every active model in the phone_models table.
+    fetch("/api/phone-models", { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Failed to load phone models");
-        if (!Array.isArray(payload.data)) throw new Error("Invalid phone models response");
+        const rows: unknown = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(rows)) throw new Error("Failed to load phone models");
         if (mounted) {
-          setPhoneModels(payload.data);
+          setPhoneModels(rows as PhoneModel[]);
           setPhoneModelsLoading(false);
         }
       })
@@ -210,14 +220,12 @@ useEffect(() => {
     }
   }
 
-  // Group phone models by brand
-  const groupedModels = phoneModels.reduce<Record<string, PhoneModel[]>>((acc, model) => {
-    if (!acc[model.brand]) {
-      acc[model.brand] = [];
-    }
-    acc[model.brand].push(model);
-    return acc;
-  }, {});
+  const groupedModels = groupPhoneModelsByBrand(phoneModels);
+  // Models saved on this product that are no longer in the active list
+  // (deactivated or renamed): shown so they can be seen and removed.
+  const activeModelKeys = new Set(phoneModels.map((m) => phoneModelKey(m.name)));
+  const savedInactiveModels = form.compatibleModels.filter((name) => !activeModelKeys.has(phoneModelKey(name)));
+  const selectedActiveCount = form.compatibleModels.length - savedInactiveModels.length;
 
   async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = event.target.files;
@@ -276,7 +284,12 @@ useEffect(() => {
   }
 
   function selectAllModels() {
-    setForm((prev) => ({ ...prev, compatibleModels: phoneModels.map((m) => m.name) }));
+    // Every active model; models saved earlier and since deactivated are kept.
+    setForm((prev) => {
+      const active = phoneModels.map((m) => m.name);
+      const activeKeys = new Set(active.map(phoneModelKey));
+      return { ...prev, compatibleModels: [...active, ...prev.compatibleModels.filter((m) => !activeKeys.has(phoneModelKey(m)))] };
+    });
   }
 
   function clearAllModels() {
@@ -599,7 +612,14 @@ useEffect(() => {
         {/* Phone Models */}
         <div className="bg-dark-card rounded-2xl p-6 border border-dark-border space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Compatible Phone Models</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Compatible Phone Models</h2>
+              {!phoneModelsLoading && !phoneModelsError && phoneModels.length > 0 && (
+                <p className="text-xs text-dark-muted mt-0.5">
+                  {selectedActiveCount === 0 ? "None selected: customers can choose any model" : `${selectedActiveCount} of ${phoneModels.length} selected`}
+                </p>
+              )}
+            </div>
             <div className="flex gap-2">
               <button type="button" onClick={selectAllModels} className="text-[10px] text-brand hover:text-brand-dark">Select All</button>
               <button type="button" onClick={clearAllModels} className="text-[10px] text-dark-muted hover:text-white">Clear</button>
@@ -618,7 +638,7 @@ useEffect(() => {
               No phone models found. <a href="/admin/phone-models" className="text-brand hover:underline ml-2">Add some first</a>.
             </div>
           ) : (
-            Object.entries(groupedModels).map(([brandName, brandModels]) => (
+            groupedModels.map(([brandName, brandModels]) => (
               <div key={brandName}>
                 <p className="text-xs text-dark-muted mb-2">{brandName}</p>
                 <div className="flex flex-wrap gap-2">
@@ -639,6 +659,23 @@ useEffect(() => {
                 </div>
               </div>
             ))
+          )}
+          {!phoneModelsLoading && !phoneModelsError && savedInactiveModels.length > 0 && (
+            <div>
+              <p className="text-xs text-dark-muted mb-2">Saved on this product, no longer active (click to remove)</p>
+              <div className="flex flex-wrap gap-2">
+                {savedInactiveModels.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleModel(name)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-amber-400/40 bg-amber-400/10 text-amber-300"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

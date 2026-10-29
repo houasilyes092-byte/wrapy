@@ -10,6 +10,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "WRAPY — Premium Phone Skins",
   description: "Wrap your world. Premium phone skins designed for those who demand excellence.",
+  verification: {
+    google: "X_TrNQyKrQ61gWPFMpXmA9jhBQ7ySnj0pa2EDtcEDOo",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

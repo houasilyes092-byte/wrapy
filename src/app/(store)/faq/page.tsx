@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Frequently Asked Questions — WRAPY",
   description: "Find answers to common questions about Wrapy, our products, and your order.",
+  alternates: { canonical: "/faq" },
 };
 
 export default async function FaqPage() {

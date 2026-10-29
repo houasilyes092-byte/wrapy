@@ -6,10 +6,18 @@ import { users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32) {
-  throw new Error("JWT_SECRET must be configured with at least 32 bytes.");
+const JWT_SECRET_ERROR = "JWT_SECRET must be configured with at least 32 bytes.";
+// Production must keep failing the build; deploy previews do not receive the secret,
+// so there the error is raised only when a session is actually signed or verified.
+if (process.env.CONTEXT === "production" && (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32)) {
+  throw new Error(JWT_SECRET_ERROR);
 }
-const JWT_SECRET = new TextEncoder().encode(jwtSecret);
+function getJwtSecret(): Uint8Array {
+  if (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32) {
+    throw new Error(JWT_SECRET_ERROR);
+  }
+  return new TextEncoder().encode(jwtSecret);
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -93,14 +101,14 @@ export async function createToken(payload: {
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("7d")
     .setIssuedAt()
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 export async function verifyToken(
   token: string
 ): Promise<{ userId: string; role: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return payload as unknown as { userId: string; role: string };
   } catch {
     return null;

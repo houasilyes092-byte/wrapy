@@ -1,7 +1,7 @@
 import { X509Certificate } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { isNonProductionNetlifyContext } from "@/lib/deploy-context";
+import { isNonProductionNetlifyContext, isProductionNetlifyContext } from "@/lib/deploy-context";
 
 // Netlify deploy previews and branch deploys must never reach a database: their
 // DATABASE_URL and DATABASE_SSL_CA are ignored, so the build does not parse them
@@ -102,7 +102,7 @@ function createDatabase(url: string): { pool: Pool; db: ReturnType<typeof drizzl
 // Production must keep failing the build when DATABASE_URL is missing.
 // Netlify deploy previews and branch deploys do not receive production secrets,
 // so there the module loads without a database and any query fails at request time.
-if (!databaseUrl && process.env.CONTEXT === "production") {
+if (!databaseUrl && isProductionNetlifyContext) {
   throw new Error("DATABASE_URL is required");
 }
 

@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { isNonProductionNetlifyContext } from "@/lib/deploy-context";
+import { isNonProductionNetlifyContext, isProductionNetlifyContext } from "@/lib/deploy-context";
 
 // Deploy previews and branch deploys must not sign sessions with the production
 // secret: their JWT_SECRET is ignored, so logins fail there instead.
@@ -12,7 +12,7 @@ const jwtSecret = isNonProductionNetlifyContext ? undefined : process.env.JWT_SE
 const JWT_SECRET_ERROR = "JWT_SECRET must be configured with at least 32 bytes.";
 // Production must keep failing the build; deploy previews do not receive the secret,
 // so there the error is raised only when a session is actually signed or verified.
-if (process.env.CONTEXT === "production" && (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32)) {
+if (isProductionNetlifyContext && (!jwtSecret || new TextEncoder().encode(jwtSecret).byteLength < 32)) {
   throw new Error(JWT_SECRET_ERROR);
 }
 function getJwtSecret(): Uint8Array {

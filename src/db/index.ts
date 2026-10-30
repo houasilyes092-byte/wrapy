@@ -1,8 +1,12 @@
 import { X509Certificate } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { isNonProductionNetlifyContext } from "@/lib/deploy-context";
 
-const databaseUrl = process.env.DATABASE_URL;
+// Netlify deploy previews and branch deploys must never reach a database: their
+// DATABASE_URL and DATABASE_SSL_CA are ignored, so the build does not parse them
+// and any query fails with a clear message instead.
+const databaseUrl = isNonProductionNetlifyContext ? undefined : process.env.DATABASE_URL;
 
 /**
  * Rebuilds PEM from however the certificate was pasted into the host's env UI
@@ -32,7 +36,7 @@ function normalizeCaPem(raw: string | undefined): string | undefined {
   return pem;
 }
 
-const databaseSslCa = normalizeCaPem(process.env.DATABASE_SSL_CA);
+const databaseSslCa = isNonProductionNetlifyContext ? undefined : normalizeCaPem(process.env.DATABASE_SSL_CA);
 
 const globalForDb = globalThis as typeof globalThis & {
   __wrapyPostgresPool?: Pool;

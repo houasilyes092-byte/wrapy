@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { isNonProductionNetlifyContext } from "@/lib/deploy-context";
 
 export const GOOGLE_FLOW_COOKIE = "wrapy-google-flow";
 export const GOOGLE_FLOW_MAX_AGE = 600;
@@ -22,6 +23,8 @@ export interface GoogleProfile {
 }
 
 export function googleConfig() {
+  // Previews must not use the production OAuth client; sign-in reports "not configured" there.
+  if (isNonProductionNetlifyContext) return null;
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();

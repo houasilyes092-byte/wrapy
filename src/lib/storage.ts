@@ -1,4 +1,5 @@
 import "server-only";
+import { isNonProductionNetlifyContext } from "@/lib/deploy-context";
 
 type SupabaseStorageConfig = {
   baseUrl: string;
@@ -19,6 +20,8 @@ export const uploadTypes: Record<string, { extension: string }> = {
 };
 
 function getConfig(): SupabaseStorageConfig | null {
+  // Previews must never write to production storage; uploads report "not configured" there.
+  if (isNonProductionNetlifyContext) return null;
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.SUPABASE_ANON_KEY;

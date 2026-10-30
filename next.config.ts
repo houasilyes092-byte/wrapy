@@ -5,6 +5,11 @@ import type { NextConfig } from "next";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  // Netlify sets CONTEXT only at build time. Inline it into the bundle so the
+  // runtime (where Netlify does not provide CONTEXT) knows which deployment it is.
+  env: {
+    NETLIFY_BUILD_CONTEXT: process.env.CONTEXT ?? "",
+  },
   turbopack: {
     root: projectRoot,
   },

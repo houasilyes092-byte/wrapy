@@ -9,8 +9,16 @@ import { FAQSection, TutorialSection, type FaqItem } from "@/components/StoreExt
 import { getPublishedFaq } from "@/lib/faq";
 import HomeReviews, { type HomeReview } from "@/components/HomeReviews";
 import { CategoriesGrid, type CategoryCard } from "@/components/CategoriesGrid";
+import type { Metadata } from "next";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Phone Skins in Tunisia | iPhone & Samsung Skins",
+  description: "Premium precision-cut vinyl phone skins for iPhone and Samsung, delivered across Tunisia with cash on delivery.",
+  alternates: { canonical: "/" },
+};
 
 export default async function HomePage() {
   const featuredProducts = await db
@@ -129,8 +137,16 @@ export default async function HomePage() {
     collectionMap[c.id] = c.name;
   }
 
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: SITE_URL,
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c") }} />
       {/* HERO */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">

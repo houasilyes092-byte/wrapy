@@ -6,11 +6,31 @@ import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
 import Image from "next/image";
 import { categoryTextureClass } from "@/lib/category-theme";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const [collection] = await db
+    .select({ name: collections.name, description: collections.description })
+    .from(collections)
+    .where(and(eq(collections.slug, slug), eq(collections.isActive, true)))
+    .limit(1);
+  if (!collection) return { title: "Category not found", robots: { index: false, follow: true } };
+
+  const name = collection.name.trim();
+  const description = (collection.description?.trim() || `Shop the ${name} phone skin collection for iPhone and Samsung, delivered across Tunisia.`).slice(0, 300);
+  return {
+    title: `${name} Phone Skins | iPhone & Samsung`,
+    description,
+    alternates: { canonical: `/collections/${slug}` },
+    openGraph: { title: `${name} | WRAPY`, description, url: `/collections/${slug}`, type: "website" },
+  };
 }
 
 export default async function CollectionPage({ params }: PageProps) {

@@ -4,10 +4,12 @@ import { CartProvider } from "@/context/cart";
 import { SettingsProvider } from "@/context/settings";
 import { WishlistProvider } from "@/context/wishlist";
 import SiteTheme from "@/components/SiteTheme";
+import { SITE_URL } from "@/lib/site";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "WRAPY — Premium Phone Skins",
   description: "Wrap your world. Premium phone skins designed for those who demand excellence.",
   verification: {

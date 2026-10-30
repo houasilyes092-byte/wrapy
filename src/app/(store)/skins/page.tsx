@@ -4,9 +4,16 @@ import { eq, and, ilike, desc, asc, inArray, sql } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/FilterSidebar";
 import { getActivePhoneModels } from "@/lib/phone-models.server";
+import type { Metadata } from "next";
 import { productFitsModel } from "@/lib/phone-models";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Phone Skins for iPhone & Samsung in Tunisia",
+  description: "Browse premium phone skins for iPhone and Samsung. Filter by collection and phone model, with cash on delivery in Tunisia.",
+  alternates: { canonical: "/skins" },
+};
 
 interface PageProps {
   searchParams: Promise<{

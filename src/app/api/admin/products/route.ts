@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { products, collections } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
-import { resolvePhoneModelNames } from "@/lib/phone-models.server";
 import { productSchema } from "@/lib/validations";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -95,15 +94,7 @@ export async function POST(req: NextRequest) {
 
     const data = parsed.data;
 
-    // Phone models must exist in the phone_models table; stored with its exact names.
-    const models = await resolvePhoneModelNames(data.compatibleModels);
-    if (models.unknown.length > 0) {
-      return NextResponse.json(
-        { error: `Unknown phone model: ${models.unknown.slice(0, 3).join(", ")}. Add it in Admin → Phone Models first.` },
-        { status: 400 }
-      );
-    }
-
+    // Every design is available for every active phone model: products carry no model list.
     const [product] = await db
       .insert(products)
       .values({
@@ -113,7 +104,6 @@ export async function POST(req: NextRequest) {
         price: data.price,
         comparePrice: data.comparePrice || null,
         images: data.images,
-        compatibleModels: models.names,
         stock: data.stock,
         madeToOrder: data.madeToOrder,
         collectionId: data.collectionId || null,

@@ -75,6 +75,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const { order, items } = data;
 
+  // Models are saved as text on each order line, so they stay readable even if
+  // the model is later renamed, deactivated or deleted in Admin → Phone Models.
+  const orderedModels = [...new Set(items.map((item) => item.phoneModel).filter((model): model is string => Boolean(model)))];
+
   const itemColumns = [
     {
       key: "product",
@@ -88,9 +92,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="min-w-0">
             <p className="text-sm text-white truncate">{item.productName}</p>
-            {item.phoneModel && <p className="text-xs text-dark-muted">{item.phoneModel}</p>}
           </div>
         </div>
+      ),
+    },
+    {
+      key: "phoneModel",
+      header: "Phone model",
+      render: (item: typeof items[0]) => (
+        <span className="text-sm text-white">{item.phoneModel || "—"}</span>
       ),
     },
     {
@@ -136,6 +146,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div><span className="text-dark-muted">Phone:</span> <span className="text-white ml-2">{order.phone}</span></div>
               {order.email && <div><span className="text-dark-muted">Email:</span> <span className="text-white ml-2">{order.email}</span></div>}
               <div><span className="text-dark-muted">City:</span> <span className="text-white ml-2">{order.city}</span></div>
+              <div><span className="text-dark-muted">Phone model:</span> <span className="text-white ml-2">{orderedModels.length > 0 ? orderedModels.join(", ") : "—"}</span></div>
               <div className="col-span-2"><span className="text-dark-muted">Address:</span> <span className="text-white ml-2">{order.address}</span></div>
               {order.notes && <div className="col-span-2"><span className="text-dark-muted">Notes:</span> <span className="text-white ml-2">{order.notes}</span></div>}
             </div>

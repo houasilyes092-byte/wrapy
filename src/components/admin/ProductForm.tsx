@@ -7,14 +7,11 @@ import { Plus, X, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { uploadFile } from "@/lib/upload-client";
-import { groupPhoneModelsByBrand, phoneModelKey, type PhoneModelOption } from "@/lib/phone-models";
 
 interface Collection {
   id: string;
   name: string;
 }
-
-type PhoneModel = PhoneModelOption;
 
 interface ProductFormProps {
   product?: {
@@ -25,7 +22,6 @@ interface ProductFormProps {
     price: number;
     comparePrice: number | null;
     images: string[];
-    compatibleModels: string[];
     stock: number;
     madeToOrder: boolean;
     collectionId: string | null;
@@ -60,9 +56,6 @@ export default function ProductForm({ product }: ProductFormProps) {
   const [error, setError] = useState("");
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionsError, setCollectionsError] = useState("");
-  const [phoneModels, setPhoneModels] = useState<PhoneModel[]>([]);
-  const [phoneModelsLoading, setPhoneModelsLoading] = useState(true);
-  const [phoneModelsError, setPhoneModelsError] = useState("");
 
   const [form, setForm] = useState({
     name: product?.name || "",
@@ -71,7 +64,6 @@ export default function ProductForm({ product }: ProductFormProps) {
     price: product ? product.price / 1000 : 0,
     comparePrice: product?.comparePrice ? product.comparePrice / 1000 : 0,
     images: product?.images || [],
-    compatibleModels: product?.compatibleModels || [],
     stock: product?.stock || 0,
     madeToOrder: product?.madeToOrder || false,
     collectionId: product?.collectionId || "",
@@ -148,14 +140,9 @@ export default function ProductForm({ product }: ProductFormProps) {
       isValid = false;
     }
 
-    if (form.compatibleModels.length === 0) {
-      errors.compatibleModels = "At least one phone model is required";
-      isValid = false;
-    }
-
     setFieldErrors(errors);
     setTouchedFields(
-      ["name", "slug", "price", "comparePrice", "stock", "collectionId", "images", "compatibleModels"].reduce(
+      ["name", "slug", "price", "comparePrice", "stock", "collectionId", "images"].reduce(
         (acc, key) => ({ ...acc, [key]: true }),
         {}
       )
@@ -177,37 +164,6 @@ useEffect(() => {
     return () => { mounted = false; };
   }, []);
 
-  const phoneModelsLoadedRef = useRef(false);
-
-  useEffect(() => {
-    if (phoneModelsLoadedRef.current) return;
-    phoneModelsLoadedRef.current = true;
-
-    let mounted = true;
-    setPhoneModelsLoading(true);
-    setPhoneModelsError("");
-
-    // Same source as the storefront: every active model in the phone_models table.
-    fetch("/api/phone-models", { cache: "no-store" })
-      .then(async (response) => {
-        const rows: unknown = await response.json().catch(() => null);
-        if (!response.ok || !Array.isArray(rows)) throw new Error("Failed to load phone models");
-        if (mounted) {
-          setPhoneModels(rows as PhoneModel[]);
-          setPhoneModelsLoading(false);
-        }
-      })
-      .catch((loadError: unknown) => {
-        if (mounted) {
-          setPhoneModelsError("Unable to load phone models. Please refresh and try again.");
-          setPhoneModelsLoading(false);
-          if (process.env.NODE_ENV === "development") console.error("Load product phone models error:", loadError);
-        }
-      });
-
-    return () => { mounted = false; };
-  }, []);
-
   function handleNameChange(name: string) {
     setForm((prev) => ({
       ...prev,
@@ -219,13 +175,6 @@ useEffect(() => {
       setFieldErrors((prev) => ({ ...prev, name: error }));
     }
   }
-
-  const groupedModels = groupPhoneModelsByBrand(phoneModels);
-  // Models saved on this product that are no longer in the active list
-  // (deactivated or renamed): shown so they can be seen and removed.
-  const activeModelKeys = new Set(phoneModels.map((m) => phoneModelKey(m.name)));
-  const savedInactiveModels = form.compatibleModels.filter((name) => !activeModelKeys.has(phoneModelKey(name)));
-  const selectedActiveCount = form.compatibleModels.length - savedInactiveModels.length;
 
   async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = event.target.files;
@@ -272,28 +221,6 @@ useEffect(() => {
       newImages[index],
     ];
     setForm((prev) => ({ ...prev, images: newImages }));
-  }
-
-  function toggleModel(model: string) {
-    setForm((prev) => ({
-      ...prev,
-      compatibleModels: prev.compatibleModels.includes(model)
-        ? prev.compatibleModels.filter((m) => m !== model)
-        : [...prev.compatibleModels, model],
-    }));
-  }
-
-  function selectAllModels() {
-    // Every active model; models saved earlier and since deactivated are kept.
-    setForm((prev) => {
-      const active = phoneModels.map((m) => m.name);
-      const activeKeys = new Set(active.map(phoneModelKey));
-      return { ...prev, compatibleModels: [...active, ...prev.compatibleModels.filter((m) => !activeKeys.has(phoneModelKey(m)))] };
-    });
-  }
-
-  function clearAllModels() {
-    setForm((prev) => ({ ...prev, compatibleModels: [] }));
   }
 
   function addTag() {
@@ -605,76 +532,6 @@ useEffect(() => {
                   <p className="text-[9px] text-dark-muted mt-1 truncate max-w-[112px]">{img}</p>
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* Phone Models */}
-        <div className="bg-dark-card rounded-2xl p-6 border border-dark-border space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Compatible Phone Models</h2>
-              {!phoneModelsLoading && !phoneModelsError && phoneModels.length > 0 && (
-                <p className="text-xs text-dark-muted mt-0.5">
-                  {selectedActiveCount === 0 ? "None selected: customers can choose any model" : `${selectedActiveCount} of ${phoneModels.length} selected`}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={selectAllModels} className="text-[10px] text-brand hover:text-brand-dark">Select All</button>
-              <button type="button" onClick={clearAllModels} className="text-[10px] text-dark-muted hover:text-white">Clear</button>
-            </div>
-          </div>
-
-          {phoneModelsLoading ? (
-            <div className="flex items-center gap-2 text-sm text-dark-muted py-3">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading phone models...
-            </div>
-          ) : phoneModelsError ? (
-            <div className="text-sm text-red-400 py-3" role="alert">{phoneModelsError}</div>
-          ) : phoneModels.length === 0 ? (
-            <div className="text-center py-8 bg-dark border border-dark-border rounded-xl text-dark-muted">
-              No phone models found. <a href="/admin/phone-models" className="text-brand hover:underline ml-2">Add some first</a>.
-            </div>
-          ) : (
-            groupedModels.map(([brandName, brandModels]) => (
-              <div key={brandName}>
-                <p className="text-xs text-dark-muted mb-2">{brandName}</p>
-                <div className="flex flex-wrap gap-2">
-                  {brandModels.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => toggleModel(model.name)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                        form.compatibleModels.includes(model.name)
-                          ? "bg-brand text-black border-brand font-medium"
-                          : "border-dark-border text-gray-400 hover:border-dark-muted"
-                      }`}
-                    >
-                      {model.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-          {!phoneModelsLoading && !phoneModelsError && savedInactiveModels.length > 0 && (
-            <div>
-              <p className="text-xs text-dark-muted mb-2">Saved on this product, no longer active (click to remove)</p>
-              <div className="flex flex-wrap gap-2">
-                {savedInactiveModels.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => toggleModel(name)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-amber-400/40 bg-amber-400/10 text-amber-300"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>

@@ -18,7 +18,7 @@ export function phoneModelKey(name: string): string {
 
 /**
  * Looser key that also ignores spaces and hyphens: "S22", "s 22" and "s-22"
- * are the same phone. Used to refuse near-duplicates and to match filters.
+ * are the same phone. Used to refuse near-duplicates when adding or renaming.
  */
 export function phoneModelLooseKey(name: string): string {
   return phoneModelKey(name).replace(/[\s-]+/g, "");
@@ -45,16 +45,4 @@ export function groupPhoneModelsByBrand<T extends { brand: string; name: string 
     else groups.set(model.brand, [model]);
   }
   return [...groups.entries()];
-}
-
-/**
- * Does a product fit the selected model? An empty compatibility list means the
- * product is made for any model (the product page then accepts any model), so
- * it matches every filter.
- */
-export function productFitsModel(compatibleModels: string[], model: string): boolean {
-  if (!model.trim()) return true;
-  if (compatibleModels.length === 0) return true;
-  const key = phoneModelLooseKey(model);
-  return compatibleModels.some((name) => phoneModelLooseKey(name) === key);
 }

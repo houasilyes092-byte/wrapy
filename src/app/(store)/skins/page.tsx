@@ -3,8 +3,6 @@ import { products, collections, reviews } from "@/db/schema";
 import { eq, and, ilike, desc, asc, inArray, sql } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/FilterSidebar";
-import { getActivePhoneModels } from "@/lib/phone-models.server";
-import { productFitsModel } from "@/lib/phone-models";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +10,6 @@ interface PageProps {
   searchParams: Promise<{
     q?: string;
     collection?: string;
-    model?: string;
     sort?: string;
     featured?: string;
     bestseller?: string;
@@ -63,7 +60,7 @@ export default async function SkinsPage({ searchParams }: PageProps) {
       orderBy = desc(products.isFeatured);
   }
 
-  let allProducts = await db
+  const allProducts = await db
     .select({
       id: products.id,
       name: products.name,
@@ -74,20 +71,10 @@ export default async function SkinsPage({ searchParams }: PageProps) {
       isBestSeller: products.isBestSeller,
       isFeatured: products.isFeatured,
       collectionId: products.collectionId,
-      compatibleModels: products.compatibleModels,
     })
     .from(products)
     .where(and(...conditions))
     .orderBy(orderBy);
-
-  const phoneModelOptions = await getActivePhoneModels();
-
-  // Phone model filter: exact model (case/spacing-insensitive, so "iPhone 15"
-  // no longer also matches "iPhone 15 Pro Max"). Products with no compatibility
-  // list are made for any model and stay listed.
-  if (params.model) {
-    allProducts = allProducts.filter((p) => productFitsModel(p.compatibleModels, params.model!));
-  }
 
   if (params.sort === "rating" && allProducts.length) {
     const ids = allProducts.map((product) => product.id);
@@ -128,7 +115,7 @@ export default async function SkinsPage({ searchParams }: PageProps) {
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Filters */}
-        <FilterSidebar collections={allCollections} phoneModels={phoneModelOptions} />
+        <FilterSidebar collections={allCollections} />
 
         {/* Products */}
         <div className="flex-1">

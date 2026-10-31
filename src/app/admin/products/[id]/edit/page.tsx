@@ -11,7 +11,6 @@ interface Product {
   price: number;
   comparePrice: number | null;
   images: string[];
-  compatibleModels: string[];
   stock: number;
   madeToOrder: boolean;
   collectionId: string | null;

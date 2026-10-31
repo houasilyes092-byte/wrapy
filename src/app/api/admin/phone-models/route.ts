@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { phoneModels } from "@/db/schema";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { cleanPhoneModelName, PHONE_MODEL_NAME_MAX } from "@/lib/phone-models";
 import { findSimilarPhoneModel } from "@/lib/phone-models.server";
@@ -21,17 +21,16 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   const [models, totalResult] = await Promise.all([
+    // The admin list shows every model, active or not, so inactive ones can be re-enabled.
     db
       .select()
       .from(phoneModels)
-      .where(eq(phoneModels.isActive, true))
       .orderBy(asc(phoneModels.brand), asc(phoneModels.name))
       .limit(limit)
       .offset(offset),
     db
       .select({ count: sql<number>`count(*)` })
-      .from(phoneModels)
-      .where(eq(phoneModels.isActive, true)),
+      .from(phoneModels),
   ]);
 
   const total = Number(totalResult[0]?.count || 0);

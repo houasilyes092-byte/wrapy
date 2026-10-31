@@ -5,6 +5,8 @@ import { checkoutSchema } from "@/lib/validations";
 import { getSession } from "@/lib/auth";
 import { calculateShipping, parseShippingPrice } from "@/lib/utils";
 import { REWARD_POINTS_COST } from "@/lib/constants";
+import { getActivePhoneModelNamesByKey } from "@/lib/phone-models.server";
+import { phoneModelKey } from "@/lib/phone-models";
 import { OrderError, deductRewardPoints } from "@/lib/loyalty";
 import {
   ORDER_ACCESS_TTL_SECONDS,
@@ -88,10 +90,27 @@ export async function POST(req: NextRequest) {
       if (existing) return existing;
     }
 
+    // Only active models from the admin phone model list are accepted. Read them
+    // before the transaction (the pool holds one connection). The order stores the
+    // exact name from the list, so spelling and case are always consistent.
+    const activeModels = await getActivePhoneModelNamesByKey();
+    const resolvePhoneModel = (raw: string | undefined): string => {
+      const typed = raw?.trim() || "";
+      if (!typed) throw new OrderError(400, "Please choose a phone model for every item in your cart.");
+      const name = activeModels.get(phoneModelKey(typed));
+      if (!name) {
+        throw new OrderError(
+          400,
+          `The phone model "${typed}" is not available. Remove that item from your cart and choose an available phone model.`
+        );
+      }
+      return name;
+    };
+
     // Merge repeated lines so stock and pricing are checked per product + model.
     const lines = new Map<string, { productId: string; phoneModel: string; quantity: number }>();
     for (const item of data.items) {
-      const phoneModel = item.phoneModel?.trim() || "";
+      const phoneModel = resolvePhoneModel(item.phoneModel);
       const key = `${item.productId}::${phoneModel}`;
       const line = lines.get(key);
       if (line) line.quantity += item.quantity;
@@ -116,10 +135,6 @@ export async function POST(req: NextRequest) {
       const validatedItems = [...lines.values()].map((line) => {
         const product = byId.get(line.productId);
         if (!product) throw new OrderError(400, "A product in your cart is no longer available.");
-
-        if (product.compatibleModels.length > 0 && line.phoneModel && !product.compatibleModels.includes(line.phoneModel)) {
-          throw new OrderError(400, `Invalid phone model for ${product.name}`);
-        }
 
         demand.set(product.id, (demand.get(product.id) ?? 0) + line.quantity);
         const total = product.price * line.quantity;
@@ -153,7 +168,7 @@ export async function POST(req: NextRequest) {
       let loyaltyDiscount = 0;
       let rewardLine: (typeof validatedItems)[number] | undefined;
       if (data.reward && session) {
-        const rewardModel = data.reward.phoneModel?.trim() || "";
+        const rewardModel = resolvePhoneModel(data.reward.phoneModel);
         rewardLine = validatedItems.find(
           (i) => i.productId === data.reward!.productId && i.phoneModel === rewardModel
         );

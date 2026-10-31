@@ -14,26 +14,13 @@ export async function getActivePhoneModels(): Promise<PhoneModelOption[]> {
 }
 
 /**
- * Map names sent by the product form to the exact names stored in
- * `phone_models` (active or not, so a product keeps a model that was later
- * deactivated). Duplicates are dropped; unknown names are reported.
+ * Active models by comparison key (case and spacing never matter), mapped to
+ * the exact name stored in `phone_models`. Checkout uses it to accept only
+ * active models and to save the canonical name on the order.
  */
-export async function resolvePhoneModelNames(names: string[]): Promise<{ names: string[]; unknown: string[] }> {
-  if (names.length === 0) return { names: [], unknown: [] };
-  const rows = await db.select({ name: phoneModels.name }).from(phoneModels);
-  const byKey = new Map(rows.map((row) => [phoneModelKey(row.name), row.name]));
-  const resolved: string[] = [];
-  const unknown: string[] = [];
-  const seen = new Set<string>();
-  for (const name of names) {
-    const key = phoneModelKey(name);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    const stored = byKey.get(key);
-    if (stored) resolved.push(stored);
-    else unknown.push(name);
-  }
-  return { names: resolved, unknown };
+export async function getActivePhoneModelNamesByKey(): Promise<Map<string, string>> {
+  const models = await getActivePhoneModels();
+  return new Map(models.map((model) => [phoneModelKey(model.name), model.name]));
 }
 
 /** Existing model that is the same phone ("S22" = "s 22" = "s-22"), if any. */

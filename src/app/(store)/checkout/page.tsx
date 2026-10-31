@@ -6,6 +6,7 @@ import { useCart } from "@/context/cart";
 import { formatPrice, calculateShipping, parseShippingPrice } from "@/lib/utils";
 import { useSettings } from "@/context/settings";
 import { REWARD_POINTS_COST } from "@/lib/constants";
+import { phoneModelKey } from "@/lib/phone-models";
 import {
   ShoppingBag,
   Loader2,
@@ -78,6 +79,23 @@ export default function CheckoutPage() {
       .then((data) => setLoyaltyPoints(typeof data?.user?.loyaltyPoints === "number" ? data.user.loyaltyPoints : null))
       .catch(() => setLoyaltyPoints(null));
   }, []);
+
+  // Active phone models from the admin list. Every cart line must use one of them;
+  // the order API enforces the same rule, this only explains it before submitting.
+  const [activeModelKeys, setActiveModelKeys] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/phone-models", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((rows: { name: string }[] | null) =>
+        setActiveModelKeys(Array.isArray(rows) ? new Set(rows.map((row) => phoneModelKey(row.name))) : null)
+      )
+      .catch(() => setActiveModelKeys(null));
+  }, []);
+
+  const isModelUnavailable = (model: string) =>
+    activeModelKeys !== null && !activeModelKeys.has(phoneModelKey(model));
+  const hasUnavailableModel = items.some((item) => isModelUnavailable(item.phoneModel));
 
   const rewardItem = items.find((item) => `${item.productId}::${item.phoneModel}` === rewardKey);
   const loyaltyDiscount = rewardItem ? rewardItem.price : 0;
@@ -205,6 +223,13 @@ export default function CheckoutPage() {
 
     // Client-side validation
     if (!validateForm()) {
+      return;
+    }
+
+    if (hasUnavailableModel) {
+      setError(
+        "Some items use a phone model that is not available. Go back to your cart, remove them, and choose an available phone model."
+      );
       return;
     }
 
@@ -557,6 +582,14 @@ export default function CheckoutPage() {
                           {item.phoneModel}
                         </p>
                       </div>
+                    )}
+
+                    {isModelUnavailable(item.phoneModel) && (
+                      <p className="text-xs text-red-400 mt-1" role="alert">
+                        {item.phoneModel
+                          ? "This phone model is not available. Remove this item from your cart."
+                          : "No phone model selected. Remove this item from your cart."}
+                      </p>
                     )}
 
                     <p className="text-xs text-dark-muted mt-1">

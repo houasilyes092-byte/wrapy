@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Trash2, Loader2, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { ResponsiveTable } from "@/components/admin/ResponsiveTable";
 import { sortPhoneModels } from "@/lib/phone-models";
 
@@ -21,6 +21,8 @@ interface Pagination {
   hasPrev: boolean;
 }
 
+const DEFAULT_BRANDS = ["iPhone", "Samsung", "Xiaomi", "Google", "OnePlus", "Other"];
+
 export default function PhoneModelsPage() {
   const [models, setModels] = useState<PhoneModel[]>([]);
   const [brand, setBrand] = useState("iPhone");
@@ -28,39 +30,53 @@ export default function PhoneModelsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const loadedRef = useRef(false);
+  const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
-    limit: 20,
+    limit: 100,
     total: 0,
     totalPages: 0,
     hasNext: false,
     hasPrev: false,
   });
 
-  async function fetchModels(page = 1) {
-    try {
-      const res = await fetch(`/api/admin/phone-models?page=${page}&limit=100`);
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error || "Failed to load models");
-      }
-
-      setModels(json.data || []);
-      setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load models");
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Row editing: one row at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    fetchModels(pagination.page);
-  }, [pagination.page]);
+    let cancelled = false;
+
+    async function fetchModels() {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/admin/phone-models?page=${page}&limit=100`, { cache: "no-store" });
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json.error || "Failed to load models");
+        }
+        if (cancelled) return;
+
+        setModels(json.data || []);
+        setPagination(json.pagination || { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false });
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load models");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchModels();
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
+
+  // Brands offered when adding or editing: the usual ones plus any already in use.
+  const brandOptions = [...new Set([...DEFAULT_BRANDS, ...models.map((model) => model.brand)])];
 
   async function addModel(e: React.FormEvent) {
     e.preventDefault();
@@ -99,11 +115,83 @@ export default function PhoneModelsPage() {
     }
   }
 
-  async function deleteModel(id: string) {
-    if (!confirm("Delete this phone model?")) return;
+  function startEdit(model: PhoneModel) {
+    setError("");
+    setEditingId(model.id);
+    setEditName(model.name);
+    setEditBrand(model.brand);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+    setEditBrand("");
+  }
+
+  async function patchModel(id: string, changes: { name?: string; brand?: string; isActive?: boolean }) {
+    try {
+      setBusyId(id);
+      setError("");
+
+      const res = await fetch(`/api/admin/phone-models/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setError(data?.error || "Failed to update model");
+        return false;
+      }
+
+      setModels((current) => current.map((model) => (model.id === id ? { ...model, ...data } : model)));
+      return true;
+    } catch {
+      setError("Network error");
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveEdit(model: PhoneModel) {
+    const nextName = editName.trim();
+    const nextBrand = editBrand.trim();
+    if (!nextName || !nextBrand) {
+      setError("Brand and name are required");
+      return;
+    }
+
+    const changes: { name?: string; brand?: string } = {};
+    if (nextName !== model.name) changes.name = nextName;
+    if (nextBrand !== model.brand) changes.brand = nextBrand;
+    if (Object.keys(changes).length === 0) {
+      cancelEdit();
+      return;
+    }
+
+    if (await patchModel(model.id, changes)) cancelEdit();
+  }
+
+  async function toggleActive(model: PhoneModel) {
+    await patchModel(model.id, { isActive: !model.isActive });
+  }
+
+  async function deleteModel(model: PhoneModel) {
+    if (
+      !confirm(
+        `Delete "${model.name}"? Customers will no longer be able to choose it. Existing orders keep the model name.`
+      )
+    ) {
+      return;
+    }
 
     try {
-      const res = await fetch(`/api/admin/phone-models/${id}`, {
+      setBusyId(model.id);
+      setError("");
+
+      const res = await fetch(`/api/admin/phone-models/${model.id}`, {
         method: "DELETE",
       });
 
@@ -114,9 +202,13 @@ export default function PhoneModelsPage() {
         return;
       }
 
-      setModels((current) => current.filter((model) => model.id !== id));
+      if (editingId === model.id) cancelEdit();
+      setModels((current) => current.filter((item) => item.id !== model.id));
+      setPagination((current) => ({ ...current, total: Math.max(0, current.total - 1) }));
     } catch {
       setError("Network error");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -124,36 +216,115 @@ export default function PhoneModelsPage() {
     {
       key: "name",
       header: "Model",
-      render: (model: PhoneModel) => (
-        <div>
-          <p className="text-sm font-medium text-white">{model.name}</p>
-          <p className="text-xs text-dark-muted">{model.brand}</p>
-        </div>
-      ),
+      render: (model: PhoneModel) =>
+        editingId === model.id ? (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              value={editBrand}
+              onChange={(e) => setEditBrand(e.target.value)}
+              aria-label="Brand"
+              className="bg-dark border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50"
+            >
+              {[...new Set([...brandOptions, editBrand])].map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveEdit(model);
+                } else if (e.key === "Escape") {
+                  cancelEdit();
+                }
+              }}
+              aria-label="Model name"
+              autoFocus
+              className="min-w-0 flex-1 bg-dark border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand/50"
+            />
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm font-medium text-white">{model.name}</p>
+            <p className="text-xs text-dark-muted">{model.brand}</p>
+          </div>
+        ),
     },
     {
       key: "status",
       header: "Status",
       render: (model: PhoneModel) => (
-        <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${model.isActive ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"}`}>
+        <button
+          type="button"
+          onClick={() => toggleActive(model)}
+          disabled={busyId === model.id}
+          title={model.isActive ? "Deactivate: customers can no longer choose it" : "Activate: customers can choose it"}
+          aria-pressed={model.isActive}
+          className={`text-[11px] font-medium px-2 py-1 rounded-full transition-colors disabled:opacity-50 ${
+            model.isActive
+              ? "bg-green-400/10 text-green-400 hover:bg-green-400/20"
+              : "bg-red-400/10 text-red-400 hover:bg-red-400/20"
+          }`}
+        >
           {model.isActive ? "Active" : "Inactive"}
-        </span>
+        </button>
       ),
     },
     {
       key: "actions",
       header: "Actions",
       align: "right" as const,
-      className: "w-24",
+      className: "w-32",
       render: (model: PhoneModel) => (
-        <button
-          type="button"
-          onClick={() => deleteModel(model.id)}
-          className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-          title="Delete"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center justify-end gap-1">
+          {editingId === model.id ? (
+            <>
+              <button
+                type="button"
+                onClick={() => saveEdit(model)}
+                disabled={busyId === model.id}
+                className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50"
+                title="Save"
+                aria-label="Save"
+              >
+                {busyId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="p-2 text-dark-muted hover:bg-white/5 rounded-lg transition-colors"
+                title="Cancel"
+                aria-label="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => startEdit(model)}
+              disabled={busyId === model.id}
+              className="p-2 text-dark-muted hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title="Edit"
+              aria-label="Edit"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => deleteModel(model)}
+            disabled={busyId === model.id}
+            className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+            title="Delete"
+            aria-label="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -165,7 +336,7 @@ export default function PhoneModelsPage() {
           Phone Models
         </h1>
         <p className="text-sm text-dark-muted mt-1">
-          Manage the phone models available for your skins.
+          Customers can only order for the active models below. Every skin is available for all of them.
         </p>
       </div>
 
@@ -183,12 +354,9 @@ export default function PhoneModelsPage() {
             onChange={(e) => setBrand(e.target.value)}
             className="bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50"
           >
-            <option value="iPhone">iPhone</option>
-            <option value="Samsung">Samsung</option>
-            <option value="Xiaomi">Xiaomi</option>
-            <option value="Google">Google</option>
-            <option value="OnePlus">OnePlus</option>
-            <option value="Other">Other</option>
+            {brandOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
           </select>
 
           <input
@@ -213,13 +381,13 @@ export default function PhoneModelsPage() {
             Add Model
           </button>
         </div>
-
-        {error && (
-          <p className="text-sm text-red-400 mt-4">
-            {error}
-          </p>
-        )}
       </form>
+
+      {error && (
+        <p className="text-sm text-red-400" role="alert">
+          {error}
+        </p>
+      )}
 
       <ResponsiveTable
         items={sortPhoneModels(models)}
@@ -238,7 +406,7 @@ export default function PhoneModelsPage() {
           </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
               disabled={!pagination.hasPrev}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label="Previous page"
@@ -249,7 +417,7 @@ export default function PhoneModelsPage() {
               Page {pagination.page} of {pagination.totalPages}
             </span>
             <button
-              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              onClick={() => setPage((current) => current + 1)}
               disabled={!pagination.hasNext}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label="Next page"

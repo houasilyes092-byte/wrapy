@@ -14,12 +14,29 @@ export interface OrderNotification {
   orderId: string;
   customerName: string;
   phone: string;
+  subtotal: number; // millimes
   total: number; // millimes
+  // Taken from the stored order + the coupon row; null when no promo was used.
+  promo: { code: string; type: string; value: number; discount: number } | null;
   items: { productName: string; phoneModel: string | null; quantity: number }[];
 }
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function promoLines(promo: OrderNotification["promo"], subtotal: number): string[] {
+  if (!promo) return ["<b>Promo Code:</b> None"];
+  const isPercent = promo.type === "percentage";
+  return [
+    `<b>Promo Code:</b> ${escapeHtml(promo.code)}`,
+    // The coupons table has no name/description column.
+    `<b>Promo Name:</b> N/A`,
+    `<b>Discount Type:</b> ${isPercent ? "Percentage" : "Fixed amount"}`,
+    `<b>Discount Value:</b> ${isPercent ? `${promo.value}%` : formatPrice(promo.value)}`,
+    `<b>Subtotal before discount:</b> ${formatPrice(subtotal)}`,
+    `<b>Discount amount:</b> ${formatPrice(promo.discount)}`,
+  ];
 }
 
 export function buildOrderMessage(order: OrderNotification): string {
@@ -36,7 +53,9 @@ export function buildOrderMessage(order: OrderNotification): string {
     "",
     ...lines,
     "",
-    `<b>Total:</b> ${formatPrice(order.total)}`,
+    ...promoLines(order.promo, order.subtotal),
+    "",
+    `<b>Total${order.promo ? " after discount" : ""}:</b> ${formatPrice(order.total)}`,
   ].join("\n");
 }
 

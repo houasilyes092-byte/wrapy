@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     let createdItems: { productName: string; phoneModel: string | null; quantity: number }[] = [];
+    let appliedCoupon = null as { type: string; value: number } | null;
 
     const order = await db.transaction(async (tx) => {
       const productIds = [...new Set([...lines.values()].map((l) => l.productId))];
@@ -194,6 +195,7 @@ export async function POST(req: NextRequest) {
           discount = coupon.type === "percentage" ? Math.round(eligible * (coupon.value / 100)) : coupon.value;
           discount = Math.min(Math.max(discount, 0), eligible);
           couponCode = coupon.code;
+          appliedCoupon = { type: coupon.type, value: coupon.value };
         }
       }
 
@@ -277,8 +279,12 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       customerName: order.customerName,
       phone: order.phone,
+      subtotal: order.subtotal,
       total: order.total,
       items: createdItems,
+      promo: order.couponCode && appliedCoupon
+        ? { code: order.couponCode, type: appliedCoupon.type, value: appliedCoupon.value, discount: order.discount }
+        : null,
     });
 
     return respondWithOrder(order.id, order.userId);

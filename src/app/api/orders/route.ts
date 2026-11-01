@@ -12,6 +12,7 @@ import {
   orderAccessCookieName,
   orderAccessPath,
 } from "@/lib/order-access";
+import { notifyNewOrder } from "@/lib/telegram";
 import { eq, and, inArray, sql, asc } from "drizzle-orm";
 
 type Session = Awaited<ReturnType<typeof getSession>>;
@@ -97,6 +98,8 @@ export async function POST(req: NextRequest) {
       if (line) line.quantity += item.quantity;
       else lines.set(key, { productId: item.productId, phoneModel, quantity: item.quantity });
     }
+
+    let createdItems: { productName: string; phoneModel: string | null; quantity: number }[] = [];
 
     const order = await db.transaction(async (tx) => {
       const productIds = [...new Set([...lines.values()].map((l) => l.productId))];
@@ -251,6 +254,11 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      createdItems = validatedItems.map((i) => ({
+        productName: i.productName,
+        phoneModel: i.phoneModel || null,
+        quantity: i.quantity,
+      }));
       return created;
     }).catch(async (error) => {
       // A concurrent identical submission won the race: return its order.
@@ -262,6 +270,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (order instanceof NextResponse) return order;
+
+    // Only reached for an order this request actually created (idempotent
+    // retries return above), so each order notifies at most once. Never throws.
+    await notifyNewOrder({
+      orderId: order.id,
+      customerName: order.customerName,
+      phone: order.phone,
+      total: order.total,
+      items: createdItems,
+    });
+
     return respondWithOrder(order.id, order.userId);
   } catch (err) {
     if (err instanceof OrderError) {
